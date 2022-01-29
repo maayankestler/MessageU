@@ -2,7 +2,8 @@ import threading
 from multiprocessing.pool import ThreadPool
 import socket
 import logging
-import time
+from protocol import Response, Request, RequestCode, ResponseCode
+from MessageU import MessageU, User, Message
 
 
 class Server:
@@ -13,19 +14,32 @@ class Server:
         self.port = port
         self.thread_pool_size = thread_pool_size
         self.socket_timeout = socket_timeout
+        self.app = MessageU()
 
-    def handle_connection(self, conn, addr):
+    def handle_connection(self, conn, addr, buff_size=1024):
         try:
             with conn:
                 logging.debug(f'Connected by {addr}')
-                data = conn.recv(1024)
-                text = data.decode("utf-8")
-                logging.debug("Received message: " + text)
-                time.sleep(1)
+                data = conn.recv(buff_size)
+                # text = data.decode("utf-8")
+                # logging.debug("Received message: " + text)
+                req = Request.process_request(data)
+                if req.code == RequestCode.register:
+                    username = "maayank"
+                    self.app.register_user(username)
+                elif req.code == RequestCode.users_list:
+                    self.app.get_users_list()
+                elif req.code == RequestCode.get_pub_key:
+                    self.app.get_pub_key()
+                elif req.code == RequestCode.send_message:
+                    self.app.send_message()
+                elif req.code == RequestCode.get_messages:
+                    self.app.get_messages()
                 logging.debug("finished", threading.currentThread().name)
                 # print(1/0)
         except Exception as e:
             logging.error(f"got {e} Exception at {threading.currentThread().name}")
+            # TODO handle Exception
 
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -45,3 +59,5 @@ class Server:
                             raise
                 except KeyboardInterrupt:
                     logging.info("shutting down")
+                finally:
+                    self.app.connection.close()
