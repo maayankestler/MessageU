@@ -29,7 +29,7 @@ class Request:
     def process_request(data_bytes):
         # read client id, Version, Code and Payload size
         pack_format = f"<{Request._client_id_size}sBHI"
-        data = struct.unpack(pack_format, data_bytes[:struct.calcsize(pack_format)])
+        data = struct.unpack(pack_format, data_bytes[:struct.calcsize(pack_format)])  # TODO handle register request
         i = struct.calcsize(pack_format)
         payload_size = data[-1]
 
@@ -53,10 +53,14 @@ class ResponseCode(Enum):
 class Response:
     _max_response_size = 4096
 
-    def __init__(self, version, code, payload_size=0, payload=""):
+    def __init__(self, version, code=-1, payload=""):
         self.version = version
-        self.code = ResponseCode(code)
-        self.payload_size = payload_size
+        try:
+            self.code = ResponseCode(code)
+        except ValueError:
+            self.code = None
+        # self.payload_size = payload_size
+        self.payload_size = len(payload)
         self.payload = payload
 
     def __str__(self):
