@@ -18,5 +18,30 @@
     <ClCompile Include="client.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MessageU.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="filesutils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Protocol.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MessageU.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="filesutils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="server.info">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
