@@ -2,6 +2,12 @@
 #include <iostream>
 #include "filesutils.h"
 #include "Protocol.h"
+#include "RSAWrapper.h"
+
+const std::string WELCOME_MESSAGE = "MessageU client at your service.";
+const std::string SERVER_CONFIG_PATH = "server.info";
+const std::string USER_INFO_PATH = "my.info";
+const uint8_t VERSION = 1;
 
 namespace InputEnum
 {
@@ -28,11 +34,6 @@ namespace InputEnum
     };
 }
 
-const std::string WELCOME_MESSAGE = "MessageU client at your service.";
-const std::string SERVER_CONFIG_PATH = "server.info";
-const std::string USER_INFO_PATH = "my.info";
-const uint8_t VERSION = 1;
-
 class MessageU
 {
 public:
@@ -43,6 +44,8 @@ public:
 private:
     std::string serverIp;
     int serverPort;
+    RSAPrivateWrapper* privateKey;
+    RSAPublicWrapper* publicKey;
     static std::string optionToText(InputEnum::userInput option);
     Response registerUser(std::string userName);
     Response getCLientList();

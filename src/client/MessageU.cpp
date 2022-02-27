@@ -11,6 +11,23 @@ MessageU::MessageU()
 	serverIp = server_address.substr(0, split_index);
 	std::string port_str = server_address.substr(split_index + 1, server_address.length() - 1);
 	serverPort = std::stoi(port_str);
+	//RSAPrivateWrapper privateKey(""); // TODO better default value (null)
+	//RSAPublicWrapper publicKey(privateKey.getPublicKey());
+	
+	try
+	{
+		std::string myinfo = fileToString(USER_INFO_PATH);
+		//RSAPrivateWrapper privateKey(myinfo); // TODO split myinfo
+		//RSAPublicWrapper publicKey(privateKey.getPublicKey());
+		privateKey = new RSAPrivateWrapper(myinfo); // TODO split myinfo
+		publicKey = new RSAPublicWrapper(privateKey->getPublicKey());
+	}
+	catch (const std::exception&)
+	{
+		std::cout << "can't find " << USER_INFO_PATH << std::endl;
+		privateKey = NULL;
+		publicKey = NULL;
+	}
 }
 
 Response MessageU::handleInput(InputEnum::userInput choice)
@@ -108,6 +125,7 @@ Response MessageU::registerUser(std::string userName)
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::registertion);
+	req.client_id = UUID(); // TODO chhose defualt value
 	if (userName.length() > MAX_USERNAME_LENGTH - 1)
 	{
 		throw std::exception("username ist to big");
@@ -115,10 +133,13 @@ Response MessageU::registerUser(std::string userName)
 	req.payload_size = MAX_USERNAME_LENGTH + PUBLIC_KEY_SIZE;
 	req.payload = new char[req.payload_size]();
 	strncpy_s(req.payload, req.payload_size, userName.c_str(), userName.length() + 1);
-	std::string pubkey = "nsajdf;nsaflsdnfklsa";  // TODO get real pubky
-	strncpy_s(&req.payload[MAX_USERNAME_LENGTH], PUBLIC_KEY_SIZE, pubkey.c_str(), pubkey.length());
-	Response(resp);
-	return resp;
+	privateKey = new RSAPrivateWrapper();
+	std::string private_key = privateKey->getPrivateKey();
+	std::string pubkey = privateKey->getPublicKey();
+	publicKey = new RSAPublicWrapper(pubkey);
+	std::memcpy(&req.payload[MAX_USERNAME_LENGTH], pubkey.c_str(), PUBLIC_KEY_SIZE);
+	//strncpy_s(&req.payload[MAX_USERNAME_LENGTH], PUBLIC_KEY_SIZE, pubkey.c_str(), pubkey.length());
+	return req.sendRequset(serverIp, serverPort);
 }
 Response MessageU::getCLientList()
 {

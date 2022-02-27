@@ -2,6 +2,14 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <WinSock2.h>
+#include <Windows.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
 
 const int MAX_LENGTH = 1024 * 1024 * 100;
 const int MAX_USERNAME_LENGTH = 255;
@@ -24,21 +32,6 @@ enum class requestCode {
     getMessages = 1104
 };
 
-class Request
-{
-public:
-    uint16_t client_id;
-    uint8_t version;
-    uint16_t code;
-    uint32_t payload_size;
-    char* payload;
-
-    char* getRequestBytes();
-
-private:
-    int bytes_amount = 0;
-};
-
 class Response
 {
 private:
@@ -58,4 +51,19 @@ public:
     {
         this->code = uint16_t(status);
     }
+};
+
+class Request
+{
+public:
+    UUID client_id;
+    uint8_t version;
+    uint16_t code;
+    uint32_t payload_size;
+    char* payload;
+    char* getRequestBytes();
+    Response sendRequset(std::string ip, int port);
+
+private:
+    int bytes_amount = 0;
 };

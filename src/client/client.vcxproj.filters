@@ -27,6 +27,15 @@
     <ClCompile Include="filesutils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cryptopp_wrapper\cryptopp_wrapper\AESWrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cryptopp_wrapper\cryptopp_wrapper\Base64Wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Protocol.h">
@@ -36,6 +45,15 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="filesutils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\AESWrapper.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\Base64Wrapper.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
