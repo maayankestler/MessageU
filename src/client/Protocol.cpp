@@ -18,7 +18,7 @@ char* Request::getRequestBytes()
     {
         std::memcpy(&request_data[this->bytes_amount], &this->payload_size, sizeof(this->payload_size));
         this->bytes_amount += sizeof(this->payload_size);
-        std::memcpy(&request_data[this->bytes_amount], &this->payload, this->payload_size); // TODO check why addin bytes?????????
+        std::memcpy(&request_data[this->bytes_amount], this->payload, this->payload_size); // TODO check why addin bytes?????????
         //strncpy_s(&request_data[this->bytes_amount], int(this->payload_size) + 1, this->payload, int(this->payload_size));
         this->bytes_amount += this->payload_size;
     }
