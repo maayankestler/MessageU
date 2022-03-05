@@ -1,6 +1,7 @@
 import socket
 import struct
 from enum import Enum
+import uuid
 
 
 class RequestCode(Enum):
@@ -15,7 +16,7 @@ class Request:
     _client_id_size = 16  # the size in bytes of client_id
 
     def __init__(self, client_id, version, code, payload_size=0, payload=""):
-        self.client_id = client_id
+        self.client_id = uuid.UUID(bytes_le=client_id)
         self.version = version
         self.code = RequestCode(code)
         self.payload_size = payload_size
@@ -51,7 +52,12 @@ class ResponseCode(Enum):
 
 
 class Response:
-    _max_response_size = 4096
+
+    # TODO chack if param or property func
+    @property
+    def _max_response_size(self):
+        # _max_response_size = 4096
+        return 4096
 
     def __init__(self, version, code=-1, payload=""):
         self.version = version
@@ -66,12 +72,9 @@ class Response:
     def __str__(self):
         return f"version: {self.version}, code: {self.code.value}, payload: {self.payload}"
 
-    def send(self, server, port):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            # pack the request vars as byes using little endian
-            b = struct.pack("<BHI", self.version, self.code, self.payload_size)
-            if self.payload_size:
-                b += struct.pack(f"{self.payload_size}s", self.payload)
-            s.connect((server, port))
-            s.sendall(b)
-            data = s.recv(self._max_response_size)
+    def send(self, conn):
+        b = struct.pack("<BHI", self.version, self.code.value, self.payload_size)
+        if self.payload_size:
+            # b += bytes(self.payload, "utf-8")
+            b += bytes(self.payload)
+        conn.sendall(b)

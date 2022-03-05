@@ -4,10 +4,12 @@ import socket
 import logging
 from protocol import Response, Request, RequestCode, ResponseCode
 from MessageU import MessageU
+#from base64 import b64encode
 
 
 class Server:
     version = 2
+    _username_size = 255
 
     def __init__(self, host="127.0.0.1", port=80, thread_pool_size=8, socket_timeout=2):
         self.host = host
@@ -25,11 +27,12 @@ class Server:
         }
 
     def handle_register_request(self, req):
-        args_list = req.payload.split("\0")
-        username = args_list[0]
-        pubkey = args_list[1]
+        username = req.payload[:self._username_size].decode("utf8").strip("\0")
+        pubkey = req.payload[self._username_size:]  # TODO transfer to string
+        # pubkey = b64encode(req.payload[self._username_size:])
         user = self.app.register_user(username, pubkey)
-        return Response(self.version, ResponseCode.register, user.client_id)
+        # return Response(self.version, ResponseCode.register, user.client_id.replace("-", ""))
+        return Response(self.version, ResponseCode.register, user.client_id.bytes_le)
 
     def handle_get_users_request(self, req):
         users = self.app.get_users_list(req.client_id)
@@ -50,7 +53,7 @@ class Server:
     def handle_connection(self, conn, addr, buff_size=1024):
         try:
             with conn:
-                logging.debug(f'Connected by {addr}')
+                logging.info(f'Connected by {addr}')
                 data = conn.recv(buff_size)
                 req = Request.process_request(data)
                 try:
@@ -62,45 +65,22 @@ class Server:
                     logging.error(f"got {e} Exception at {req.code.name} request")
                     resp = Response(self.version, ResponseCode.error)
                 finally:
-                    logging.debug(f"finished handle {req.code} request")
-                    resp.send(*addr)
+                    logging.info(f"finished handle {req.code} request")
+                    resp.send(conn)
         except Exception as e:
             logging.error(f"got {e} Exception at {threading.currentThread().name}")
             # TODO handle Exception
 
-        # resp = Response(self.version)
-        # if req.code == RequestCode.register:
-        #     args_list = req.payload.split("\0")
-        #     username = args_list[0]
-        #     pubkey = args_list[1]
-        #     self.app.register_user(username, pubkey)
-        #     resp.code = ResponseCode.register
-        # elif req.code == RequestCode.users_list:
-        #     users = self.app.get_users_list(req.client_id)
-        #     resp.code = ResponseCode.users_list
-        # elif req.code == RequestCode.get_pub_key:
-        #     pubkey = self.app.get_pub_key(req.client_id)
-        #     resp.code = ResponseCode.get_pub_key
-        # elif req.code == RequestCode.send_message:
-        #     self.app.send_message(*req.payload)  # TODO split payload by bytes
-        #     resp.code = ResponseCode.send_message
-        # elif req.code == RequestCode.get_messages:
-        #     self.app.get_messages()
-        #     resp.code = ResponseCode.get_messages
-        # else:
-        #     logging.error(f"can't recognize RequestCode {req.code}")
-        #     resp.code = ResponseCode.error
-
     def run(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(self.socket_timeout)
-            s.bind((self.host, self.port))
-            s.listen()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(self.socket_timeout)
+            sock.bind((self.host, self.port))
+            sock.listen()
             with ThreadPool(self.thread_pool_size) as pool:
                 try:
                     while True:
                         try:
-                            conn, addr = s.accept()
+                            conn, addr = sock.accept()
                             pool.apply_async(self.handle_connection, (conn, addr))
                         except socket.timeout:
                             logging.debug("refresh socket")
@@ -109,5 +89,3 @@ class Server:
                             raise
                 except KeyboardInterrupt:
                     logging.info("shutting down")
-                finally:
-                    self.app.connection.close()

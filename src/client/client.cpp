@@ -12,16 +12,24 @@ int main()
 	{
 		app.printMenu();
 		std::cin >> user_input;
-		choice = InputEnum::userInput(user_input); // TODO handle invalid input
-		if (choice == InputEnum::exitApp) // TODO check if can be done at handleInput
-			break;
+		if (std::cin.fail())
+		{
+			std::cin.clear();
+			std::cin.ignore();
+			std::cout << "got invalid input, please try again" << std::endl << std::endl;
+		}
 		else
 		{
-			app.handleInput(choice);
-			// resp = app.handleInput(choice);
-			if (resp.code == int(responseCode::generalError))
+			choice = InputEnum::userInput(user_input); // TODO handle invalid input
+			if (choice == InputEnum::userInput::exitApp) // TODO check if can be done at handleInput
+				break;
+			else
 			{
-				std::cout << "server responded with an error" << std::endl;
+				resp = app.handleInput(choice);
+				if (resp.code == int(responseCode::generalError))
+				{
+					std::cout << "server responded with an error" << std::endl;
+				}
 			}
 		}
 	}

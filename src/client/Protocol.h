@@ -38,10 +38,10 @@ private:
     int bytes_amount = 0;
 
 public:
-    uint8_t version;
-    uint16_t code;
-    uint32_t payload_size;
-    char* payload;
+    uint8_t version{};
+    uint16_t code{};
+    uint32_t payload_size{};
+    char* payload{};
 
     //char* getResponseBytes();
 
@@ -56,11 +56,11 @@ public:
 class Request
 {
 public:
-    UUID client_id;
-    uint8_t version;
-    uint16_t code;
-    uint32_t payload_size;
-    char* payload;
+    UUID client_id{};
+    uint8_t version{};
+    uint16_t code{};
+    uint32_t payload_size{};
+    char* payload{};
     char* getRequestBytes();
     Response sendRequset(std::string ip, int port);
 
