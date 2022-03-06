@@ -13,10 +13,10 @@ char* Request::getRequestBytes()
         this->bytes_amount += sizeof(this->version);
         std::memcpy(&request_data[this->bytes_amount], &this->code, sizeof(this->code));
         this->bytes_amount += sizeof(this->code);
+        std::memcpy(&request_data[this->bytes_amount], &this->payload_size, sizeof(this->payload_size));
+        this->bytes_amount += sizeof(this->payload_size);
         if (this->payload_size != NULL)
         {
-            std::memcpy(&request_data[this->bytes_amount], &this->payload_size, sizeof(this->payload_size));
-            this->bytes_amount += sizeof(this->payload_size);
             std::memcpy(&request_data[this->bytes_amount], this->payload, this->payload_size);
             this->bytes_amount += this->payload_size;
         }

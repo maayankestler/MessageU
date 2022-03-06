@@ -53,10 +53,11 @@ private:
     RSAPublicWrapper* publicKey;
     static std::string optionToText(InputEnum::userInput option);
     static std::string hexStr(unsigned char* data, int len);
-    static std::string UuidStr(UUID uuid);
+    static std::string UuidToStr(UUID uuid);
+    static UUID StrToUuid(std::string uuid_str);
     Response registerUser(std::string userName);
     Response getCLientList();
-    Response getPubKey();
+    Response getPubKey(std::string client_id_str);
     Response getMessages();
     Response sendMessage();
     Response requestSymKey();

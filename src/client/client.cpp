@@ -12,6 +12,7 @@ int main()
 	{
 		app.printMenu();
 		std::cin >> user_input;
+		std::cout << std::endl;
 		if (std::cin.fail())
 		{
 			std::cin.clear();
@@ -32,5 +33,6 @@ int main()
 				}
 			}
 		}
+		std::cout << std::endl;
 	}
 }

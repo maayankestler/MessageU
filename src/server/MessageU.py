@@ -3,9 +3,12 @@ import sqlite3
 import uuid
 from datetime import datetime
 from contextlib import closing
+import struct
 
 
 class MessageU:
+    max_username_size = 255
+
     def __init__(self, db_file="server.db"):
         self.db_file = db_file
         # self.connection = sqlite3.connect(self.db_file, check_same_thread=False)  # TODO think about multi threads
@@ -32,13 +35,13 @@ class MessageU:
         except sqlite3.OperationalError as e:
             logging.warning(e)
 
-    def register_user(self, username, pubkey="b"*160):
+    def register_user(self, username, pubkey):
         user = User(username=username, pubkey=pubkey)
         try:
             with sqlite3.connect(self.db_file) as connection:
                 with closing(connection.cursor()) as cursor:
-                    cursor.execute('''INSERT INTO clients(UserName,ID,PublicKey,LastSeen)
-                                   VALUES(?,?,?,?)''', (user.username, user.client_id.bytes_le, user.pubkey, user.last_seen))
+                    cursor.execute('''INSERT INTO clients(UserName,ID,PublicKey,LastSeen) VALUES(?,?,?,?)''',
+                                   (user.username, user.client_id.bytes_le, user.pubkey, user.last_seen))
                 connection.commit()
             return user
         except sqlite3.IntegrityError:
@@ -48,14 +51,14 @@ class MessageU:
     def get_users_list(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
-                users = list(cursor.execute('SELECT * FROM clients WHERE ID!=:id', {"id": client_id}))
+                users = list(cursor.execute('SELECT * FROM clients WHERE ID!=:id', {"id": client_id.bytes_le}))
         users = list(map(lambda r: User(*r), users))
         return users
 
     def get_pub_key(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
-                user_row = list(cursor.execute('SELECT * FROM clients WHERE ID=:id', {"id": client_id}))[0]
+                user_row = list(cursor.execute('SELECT * FROM clients WHERE ID=:id', {"id": client_id.bytes_le}))[0]
         user = User(*user_row)
         return user.pubkey
 
@@ -64,8 +67,8 @@ class MessageU:
         try:
             with sqlite3.connect(self.db_file) as connection:
                 with closing(connection.cursor()) as cursor:
-                    cursor.execute('''INSERT INTO messages(ToClient,FromClient,Type,Content)
-                                   VALUES(?,?,?,?)''', (msg.to_client, msg.from_client, msg.message_type, msg.content))
+                    cursor.execute('''INSERT INTO messages(ToClient,FromClient,Type,Content) VALUES(?,?,?,?)''',
+                                   (msg.to_client.bytes_le, msg.from_client.bytes_le, msg.message_type, msg.content))
                 connection.commit()
             return msg
         except sqlite3.IntegrityError:
@@ -75,20 +78,26 @@ class MessageU:
     def get_messages(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
-                msgs = list(cursor.execute('SELECT * FROM messages WHERE ID=:id', {"id": client_id}))
+                msgs = list(cursor.execute('SELECT * FROM messages WHERE ID=:id', {"id": client_id.bytes_le}))
         msgs = list(map(lambda r: Message(*r), msgs))
         return msgs
 
 
 class User:
     def __init__(self, username, client_id=None,  pubkey=None, last_seen=None):
-        self.client_id = client_id if client_id else uuid.uuid4()
+        self.client_id = uuid.UUID(bytes_le=client_id) if client_id else uuid.uuid4()
         self.username = username
-        self.pubkey = pubkey if pubkey else "b"  # * 160  # TODO generate pubkey from private key
+        self.pubkey = pubkey
         self.last_seen = last_seen if last_seen else datetime.now()
 
     def __str__(self):
         return f"username: {self.username}, id: {self.client_id} last_seen: {self.last_seen}"
+
+    def __bytes__(self):
+        b = bytes()
+        b += self.client_id.bytes_le
+        b += bytes(self.username, "utf-8") + struct.pack("<B", 0) * (MessageU.max_username_size - len(self.username))
+        return b
 
 
 class Message:

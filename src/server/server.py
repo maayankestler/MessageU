@@ -4,7 +4,6 @@ import socket
 import logging
 from protocol import Response, Request, RequestCode, ResponseCode
 from MessageU import MessageU
-#from base64 import b64encode
 
 
 class Server:
@@ -36,11 +35,14 @@ class Server:
 
     def handle_get_users_request(self, req):
         users = self.app.get_users_list(req.client_id)
-        return Response(self.version, ResponseCode.users_list, users)  # TODO handle users list to payload
+        users_bytes = bytes()
+        for user in users:
+            users_bytes += bytes(user)
+        return Response(self.version, ResponseCode.users_list, users_bytes)  # TODO handle users list to payload
 
     def handle_get_pubkey_request(self, req):
         pubkey = self.app.get_pub_key(req.client_id)
-        return Response(self.version, ResponseCode.get_pub_key, pubkey)
+        return Response(self.version, ResponseCode.get_pub_key, req.client_id.bytes_le + pubkey)
 
     def handle_send_message_request(self, req):
         msg = self.app.send_message(*req.payload)  # TODO split payload by bytes
@@ -65,7 +67,7 @@ class Server:
                     logging.error(f"got {e} Exception at {req.code.name} request")
                     resp = Response(self.version, ResponseCode.error)
                 finally:
-                    logging.info(f"finished handle {req.code} request")
+                    logging.info(f"finished handle {req.code.name} request")
                     resp.send(conn)
         except Exception as e:
             logging.error(f"got {e} Exception at {threading.currentThread().name}")

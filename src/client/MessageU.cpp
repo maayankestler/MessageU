@@ -10,9 +10,6 @@ MessageU::MessageU()
 	serverIp = server_address.substr(0, split_index);
 	std::string port_str = server_address.substr(split_index + 1, server_address.length() - 1);
 	serverPort = std::stoi(port_str);
-	//RSAPrivateWrapper privateKey(""); // TODO better default value (null)
-	//RSAPublicWrapper publicKey(privateKey.getPublicKey());
-	
 	try
 	{
 		std::string myinfo = fileToString(USER_INFO_PATH);
@@ -23,11 +20,7 @@ MessageU::MessageU()
 		std::getline(ss, client_id_str, '\n');
 		ss << ss.rdbuf();
 		private_key_str = ss.str();
-
-		// add "-" to match the UuidFromString convention
-		for (int i=8;i<24;i+=5)
-			client_id_str.insert(i, "-");
-		UuidFromStringA((RPC_CSTR)client_id_str.c_str(), &client_id);
+		client_id = StrToUuid(client_id_str);
 		std::string b64private_key_str = Base64Wrapper::decode(private_key_str);
 		privateKey = new RSAPrivateWrapper(b64private_key_str);
 		publicKey = new RSAPublicWrapper(privateKey->getPublicKey());
@@ -67,8 +60,13 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			resp = getCLientList();
 			break;
 		case InputEnum::userInput::getPubKey:
-			resp = getPubKey();
+		{
+			std::string client_id_str;
+			std::cout << "enter client id: ";
+			std::cin >> client_id_str;
+			resp = getPubKey(client_id_str);
 			break;
+		}
 		case InputEnum::userInput::getMessages:
 			resp = getMessages();
 			break;
@@ -146,7 +144,7 @@ Response MessageU::registerUser(std::string userName)
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::registertion);
-	req.client_id = UUID(); // TODO chhose defualt value
+	req.client_id = UUID();
 	req.payload_size = MAX_USERNAME_LENGTH + PUBLIC_KEY_SIZE;
 	req.payload = new char[req.payload_size]();
 	strncpy_s(req.payload, userName.length() + 1, userName.c_str(), userName.length() + 1);
@@ -160,7 +158,7 @@ Response MessageU::registerUser(std::string userName)
 	{
 		username = userName;
 		std::memcpy(&client_id, resp.payload, sizeof(UUID));
-		std::string client_id_str = UuidStr(client_id);
+		std::string client_id_str = UuidToStr(client_id);
 		std::ofstream myfile;
 		myfile.open(USER_INFO_PATH);
 		myfile << userName << std::endl << client_id_str << std::endl << Base64Wrapper::encode(private_key_str);
@@ -171,11 +169,41 @@ Response MessageU::registerUser(std::string userName)
 }
 Response MessageU::getCLientList()
 {
-	return Response();
+	Request(req);
+	req.version = VERSION;
+	req.code = uint16_t(requestCode::users_list);
+	req.client_id = client_id;
+	Response resp = req.sendRequset(serverIp, serverPort);
+
+	UUID id;
+	std::cout << "ID                               | username" << std::endl;
+	std::cout << "-------------------------------------------" << std::endl;
+	for (int i = 0; i < resp.payload_size; i += MAX_USERNAME_LENGTH + sizeof(UUID))
+	{
+		std::memcpy(&id, &resp.payload[i], sizeof(UUID));
+		std::string ustr = UuidToStr(id);
+		std::cout << ustr << " | ";
+		std::cout << &resp.payload[i + sizeof(UUID)] << std::endl;
+	}
+	return resp;
 }
-Response MessageU::getPubKey()
+Response MessageU::getPubKey(std::string client_id_str)
 {
-	return Response();
+	Request(req);
+	req.version = VERSION;
+	req.code = uint16_t(requestCode::getPubKey);
+	req.client_id = client_id;
+	UUID dst_client_id = StrToUuid(client_id_str);
+	req.payload_size = sizeof(dst_client_id);
+	req.payload = new char[req.payload_size]();
+	std::memcpy(req.payload, &dst_client_id, sizeof(dst_client_id));
+	Response resp = req.sendRequset(serverIp, serverPort);
+	RSAPublicWrapper dst_pubkey = RSAPublicWrapper(&resp.payload[sizeof(UUID)], PUBLIC_KEY_SIZE);
+	std::cout << std::endl
+		
+		<< "the public key is:" << std::endl;
+	std::cout << Base64Wrapper::encode(dst_pubkey.getPublicKey());
+	return resp;
 }
 Response MessageU::getMessages()
 {
@@ -205,10 +233,24 @@ std::string MessageU::hexStr(unsigned char* data, int len)
 }
 
 // TODO think where to put this func
-std::string MessageU::UuidStr(UUID uuid)
+std::string MessageU::UuidToStr(UUID uuid)
 {
 	std::stringstream ss;
-	ss << std::hex << uuid.Data1 << uuid.Data2 << uuid.Data3;
+	ss << std::hex << std::setw(sizeof(uuid.Data1) * 2) << std::setfill('0') << uuid.Data1;
+	ss << std::hex << std::setw(sizeof(uuid.Data2) * 2) << std::setfill('0') << uuid.Data2;
+	ss << std::hex << std::setw(sizeof(uuid.Data3) * 2) << std::setfill('0') << uuid.Data3;
 	ss << hexStr(uuid.Data4, sizeof(uuid.Data4));
 	return ss.str();
 }
+
+// TODO think where to put this func
+UUID MessageU::StrToUuid(std::string uuid_str)
+{
+	UUID uuid;
+	// add "-" to match the UuidFromString convention
+	for (int i = 8;i < 24;i += 5) // TODO handle magic numbers
+		uuid_str.insert(i, "-");
+	UuidFromStringA((RPC_CSTR)uuid_str.c_str(), &uuid);
+	return uuid;
+}
+
