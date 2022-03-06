@@ -4,6 +4,8 @@ import socket
 import logging
 from protocol import Response, Request, RequestCode, ResponseCode
 from MessageU import MessageU
+import uuid
+import struct
 
 
 class Server:
@@ -27,7 +29,7 @@ class Server:
 
     def handle_register_request(self, req):
         username = req.payload[:self._username_size].decode("utf8").strip("\0")
-        pubkey = req.payload[self._username_size:]  # TODO transfer to string
+        pubkey = req.payload[self._username_size:]
         # pubkey = b64encode(req.payload[self._username_size:])
         user = self.app.register_user(username, pubkey)
         # return Response(self.version, ResponseCode.register, user.client_id.replace("-", ""))
@@ -41,16 +43,32 @@ class Server:
         return Response(self.version, ResponseCode.users_list, users_bytes)  # TODO handle users list to payload
 
     def handle_get_pubkey_request(self, req):
-        pubkey = self.app.get_pub_key(req.client_id)
-        return Response(self.version, ResponseCode.get_pub_key, req.client_id.bytes_le + pubkey)
+        client_id = uuid.UUID(bytes_le=req.payload)
+        pubkey = self.app.get_pub_key(client_id)
+        return Response(self.version, ResponseCode.get_pub_key, client_id.bytes_le + pubkey)
 
     def handle_send_message_request(self, req):
-        msg = self.app.send_message(*req.payload)  # TODO split payload by bytes
-        return Response(self.version, ResponseCode.users_list, msg.to_client + msg.message_id)
+        # read client id, type, and content size
+        pack_format = f"<{Request.client_id_size}sBI"
+        data = struct.unpack(pack_format, req.payload[:struct.calcsize(pack_format)])
+        i = struct.calcsize(pack_format)
+        to_client_byes, message_type, content_size = data
+        to_client = uuid.UUID(bytes_le=to_client_byes)
+        if content_size:
+            pack_format = f"<{content_size}s"
+            data += struct.unpack(pack_format, req.payload[i:i + struct.calcsize(pack_format)])
+            msg = self.app.send_message(to_client, req.client_id, message_type, data[-1])
+        else:
+            msg = self.app.send_message(to_client, req.client_id, message_type)
+        msg_bytes = msg.to_client.bytes_le + struct.pack("<I", msg.message_id)
+        return Response(self.version, ResponseCode.send_message, msg_bytes)
 
     def handle_get_messages_request(self, req):
         msgs = self.app.get_messages(req.client_id)
-        return Response(self.version, ResponseCode.get_messages, msgs)  # TODO handle msgs list to payload
+        msgs_bytes = bytes()
+        for msg in msgs:
+            msgs_bytes += bytes(msg)
+        return Response(self.version, ResponseCode.get_messages, msgs_bytes)
 
     def handle_connection(self, conn, addr, buff_size=1024):
         try:
@@ -64,10 +82,11 @@ class Server:
                     logging.error(f"can't recognize RequestCode {req.code}")
                     resp = Response(self.version, ResponseCode.error)
                 except Exception as e:
-                    logging.error(f"got {e} Exception at {req.code.name} request")
+                    logging.error(f"got '{e}' Exception at {req.code.name} request")
                     resp = Response(self.version, ResponseCode.error)
                 finally:
-                    logging.info(f"finished handle {req.code.name} request")
+                    logging.info(f"finished handle {req.code.name} request "
+                                 f"from {req.client_id} with code {resp.code.name}")
                     resp.send(conn)
         except Exception as e:
             logging.error(f"got {e} Exception at {threading.currentThread().name}")

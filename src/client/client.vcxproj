@@ -156,6 +156,7 @@
     <ClCompile Include="Protocol.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClientInfo.h" />
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\AESWrapper.h" />
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\Base64Wrapper.h" />
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.h" />

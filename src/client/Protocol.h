@@ -13,7 +13,6 @@
 
 const int MAX_LENGTH = 1024 * 1024 * 100;
 const int MAX_USERNAME_LENGTH = 255;
-const int PUBLIC_KEY_SIZE = 160;
 
 enum class responseCode {
     registertion = 2100,
@@ -36,7 +35,7 @@ class Response
 {
 private:
     int bytes_amount = 0;
-
+    // TOD add getters and setters??????
 public:
     uint8_t version{};
     uint16_t code{};
@@ -55,6 +54,7 @@ public:
 
 class Request
 {
+    // TOD add getters and setters??????
 public:
     UUID client_id{};
     uint8_t version{};

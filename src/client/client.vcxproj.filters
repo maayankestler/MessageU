@@ -56,6 +56,9 @@
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="ClientInfo.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="server.info">

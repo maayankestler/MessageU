@@ -13,7 +13,7 @@ class RequestCode(Enum):
 
 
 class Request:
-    _client_id_size = 16  # the size in bytes of client_id
+    client_id_size = 16  # the size in bytes of client_id
 
     def __init__(self, client_id, version, code, payload_size=0, payload=""):
         self.client_id = uuid.UUID(bytes_le=client_id)
@@ -29,8 +29,8 @@ class Request:
     @staticmethod
     def process_request(data_bytes):
         # read client id, Version, Code and Payload size
-        pack_format = f"<{Request._client_id_size}sBHI"
-        data = struct.unpack(pack_format, data_bytes[:struct.calcsize(pack_format)])  # TODO handle register request
+        pack_format = f"<{Request.client_id_size}sBHI"
+        data = struct.unpack(pack_format, data_bytes[:struct.calcsize(pack_format)])
         i = struct.calcsize(pack_format)
         payload_size = data[-1]
 
@@ -53,7 +53,7 @@ class ResponseCode(Enum):
 
 class Response:
 
-    # TODO chack if param or property func
+    # TODO check if param or property func
     @property
     def _max_response_size(self):
         # _max_response_size = 4096
@@ -75,6 +75,5 @@ class Response:
     def send(self, conn):
         b = struct.pack("<BHI", self.version, self.code.value, self.payload_size)
         if self.payload_size:
-            # b += bytes(self.payload, "utf-8")
-            b += bytes(self.payload)
+            b += self.payload
         conn.sendall(b)

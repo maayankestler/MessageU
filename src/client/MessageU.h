@@ -1,9 +1,12 @@
 #pragma once
 #include <iostream>
+#include <map>
 #include "filesutils.h"
 #include "Protocol.h"
 #include "RSAWrapper.h"
 #include "Base64Wrapper.h"
+#include "AESWrapper.h"
+#include "ClientInfo.h"
 
 #pragma comment(lib, "rpcrt4.lib")
 
@@ -58,8 +61,13 @@ private:
     Response registerUser(std::string userName);
     Response getCLientList();
     Response getPubKey(std::string client_id_str);
+    enum class messageType {
+        requestSymKey = 1,
+        sendSymKey = 2,
+        sendText = 3,
+        sendFile = 4,
+    };
     Response getMessages();
-    Response sendMessage();
-    Response requestSymKey();
-    Response sendSymKey();
+    Response sendMessage(std::string client_id_str, messageType type, std::string content);
+    std::map<std::string, ClientInfo*> clients;
 };

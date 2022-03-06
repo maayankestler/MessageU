@@ -58,17 +58,20 @@ class MessageU:
     def get_pub_key(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
-                user_row = list(cursor.execute('SELECT * FROM clients WHERE ID=:id', {"id": client_id.bytes_le}))[0]
-        user = User(*user_row)
+                user_row_list = list(cursor.execute('SELECT * FROM clients WHERE ID=:id', {"id": client_id.bytes_le}))
+        assert len(user_row_list) > 0, f"client {client_id} not found"
+        user = User(*user_row_list[0])
         return user.pubkey
 
-    def send_message(self, to_client, from_client, message_type, content):
+    def send_message(self, to_client, from_client, message_type, content=b""):
         msg = Message(to_client, from_client, message_type, content)
         try:
             with sqlite3.connect(self.db_file) as connection:
                 with closing(connection.cursor()) as cursor:
                     cursor.execute('''INSERT INTO messages(ToClient,FromClient,Type,Content) VALUES(?,?,?,?)''',
                                    (msg.to_client.bytes_le, msg.from_client.bytes_le, msg.message_type, msg.content))
+                    if not msg.message_id:
+                        msg.message_id = cursor.lastrowid
                 connection.commit()
             return msg
         except sqlite3.IntegrityError:
@@ -78,8 +81,14 @@ class MessageU:
     def get_messages(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
-                msgs = list(cursor.execute('SELECT * FROM messages WHERE ID=:id', {"id": client_id.bytes_le}))
-        msgs = list(map(lambda r: Message(*r), msgs))
+                msgs_rows = list(cursor.execute('SELECT * FROM messages WHERE ToClient=:id', {"id": client_id.bytes_le}))
+        # msgs = list(map(lambda r: Message(*r), msgs))
+        msgs = []
+        for r in msgs_rows:
+            to_client, from_client, message_type, content, message_id = r
+            msg = Message(uuid.UUID(bytes_le=to_client), uuid.UUID(bytes_le=from_client),
+                          message_type, content, message_id)
+            msgs.append(msg)
         return msgs
 
 
@@ -105,8 +114,18 @@ class Message:
         self.to_client = to_client
         self.from_client = from_client
         self.message_type = message_type
-        self.content = content
-        self.message_id = message_id  # if message_id else "b" * 4  # TODO create message ID
+        self.content = content if content else bytes()
+        self.message_id = message_id  # TODO create message ID
 
     def __str__(self):
         return f"message with id '{self.message_id}'  from '{self.from_client}' to '{self.to_client}'"
+
+    def __bytes__(self):  # , full_message=False):
+        b = self.from_client.bytes_le + struct.pack("<IBI", self.message_id, self.message_type, len(self.content))
+        b += self.content
+        # if full_message:
+        #     b += self.from_client.bytes_le + struct.pack("<IB", self.message_id, self.message_type)
+        #     b += self.content
+        # else:
+        #     b += self.to_client.bytes_le + struct.pack("<I", self.message_id)
+        return b
