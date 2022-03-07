@@ -64,7 +64,7 @@ private:
     static UUID StrToUuid(std::string uuid_str);
     Response registerUser(std::string userName);
     Response getCLientList();
-    Response getPubKey(std::string client_id_str);
+    Response getPubKey(ClientInfo* user_info);
     enum class messageType {
         requestSymKey = 1,
         sendSymKey = 2,
@@ -72,7 +72,8 @@ private:
         sendFile = 4,
     };
     Response getMessages();
-    Response sendMessage(std::string client_id_str, messageType type, std::string content);
+    Response sendMessage(ClientInfo* user_info, messageType type, std::string content);
     std::map<std::string, ClientInfo*> clients;
     std::map<std::string, std::string> clientsIdToUsername;
+    ClientInfo* getClientInput();
 };

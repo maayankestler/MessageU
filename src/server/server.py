@@ -68,7 +68,9 @@ class Server:
         msgs_bytes = bytes()
         for msg in msgs:
             msgs_bytes += bytes(msg)
-        return Response(self.version, ResponseCode.get_messages, msgs_bytes)
+        resp = Response(self.version, ResponseCode.get_messages, msgs_bytes)
+        self.app.delete_messages(msgs)
+        return resp
 
     def handle_connection(self, conn, addr, buff_size=1024):
         try:

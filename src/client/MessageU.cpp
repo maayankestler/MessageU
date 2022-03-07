@@ -64,12 +64,8 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			break;
 		case InputEnum::userInput::getPubKey:
 		{
-			// TODO change to username
-			std::string username;
-			std::cout << "enter client username: ";
-			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, username);
-			resp = getPubKey(username);
+			ClientInfo* user_info = getClientInput();
+			resp = getPubKey(user_info);
 			break;
 		}
 		case InputEnum::userInput::getMessages:
@@ -79,61 +75,44 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		}
 		case InputEnum::userInput::sendMessage:
 		{
-			std::string client_username, text_message;
-			std::cout << "enter client username: ";
-			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_username);
-			ClientInfo* dst_client = clients[client_username];
-			if (dst_client == NULL)
-			{
-				std::string err_msg = "unknown client '" + client_username + "' please get clients list";
-				throw std::exception(err_msg.c_str());
-			}
+			ClientInfo* dst_client = getClientInput();
 			AESWrapper* sym_key = dst_client->getSymKey();
 			if (sym_key == NULL)
 			{
 				//std::cout << "can’t decrypt message" << std::endl;
 				throw std::exception("can’t decrypt message");
 			}
+			std::string text_message;
 			std::cout << "enter text: ";
 			std::getline(std::cin, text_message);
 			std::string text_message_encrypted = sym_key->encrypt(text_message.c_str(), text_message.length());
-			resp = sendMessage(client_username, messageType::sendText, text_message_encrypted);	
+			resp = sendMessage(dst_client, messageType::sendText, text_message_encrypted);
 			break;
 		}
 		case InputEnum::userInput::requestSymKey:
 		{
-			std::string client_username;
-			std::cout << "enter client username: ";
-			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_username);
-			resp = sendMessage(client_username, messageType::requestSymKey, "");
+			ClientInfo* dst_client = getClientInput();
+			resp = sendMessage(dst_client, messageType::requestSymKey, "");
 			break;
 		}
 		case InputEnum::userInput::sendSymKey:
 		{
-			std::string client_username;
-			std::cout << "enter client username: ";
-			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_username);
-			// generate Sym Key
+			ClientInfo* dst_client = getClientInput();
 			unsigned char key[AESWrapper::DEFAULT_KEYLENGTH];
 			AESWrapper::GenerateKey(key, AESWrapper::DEFAULT_KEYLENGTH);
-			//AESWrapper aes(key, AESWrapper::DEFAULT_KEYLENGTH);
-			ClientInfo* dst_client = clients[client_username];
-			if (dst_client == NULL)
-			{
-				std::string err_msg = "unknown client '" + client_username + "' please get clients list";
-				throw std::exception(err_msg.c_str());
-			}
 			dst_client->setSymKey(key);
 			if (dst_client->getPubKey() == NULL)
 			{
-				std::string err_msg = "unknown public key for '" + client_username + "' please request public key";
+				std::string err_msg = "unknown public key for '" + dst_client->getUserName() + "' please request public key";
 				throw std::exception(err_msg.c_str());
 			}
 			std::string sym_key = dst_client->getPubKey()->encrypt((const char*)key, AESWrapper::DEFAULT_KEYLENGTH);
-			resp = sendMessage(client_username, messageType::sendSymKey, sym_key);
+			resp = sendMessage(dst_client, messageType::sendSymKey, sym_key);
+			break;
+		}
+		case InputEnum::userInput::sendFile:
+		{
+			ClientInfo* dst_client = getClientInput();
 			break;
 		}
 		case InputEnum::userInput::exitApp:
@@ -233,20 +212,12 @@ Response MessageU::getCLientList()
 	}
 	return resp;
 }
-Response MessageU::getPubKey(std::string client_username)
+Response MessageU::getPubKey(ClientInfo* user_info)
 {
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::getPubKey);
 	req.client_id = client_id;
-	//UUID dst_client_id = StrToUuid(client_id_str);
-	ClientInfo* user_info = clients[client_username];
-	if (user_info == NULL)
-	{
-		std::string err_msg = "unknown client '" + client_username + "' please get clients list";
-		throw std::exception(err_msg.c_str());
-		//std::cout << "unkown user '" << client_username << "', try to get client list again" << std::endl;
-	}
 	UUID dst_client_id = user_info->getId();
 	req.payload_size = sizeof(dst_client_id);
 	req.payload = new char[req.payload_size]();
@@ -284,7 +255,6 @@ Response MessageU::getMessages()
 	{
 		std::memcpy(&user_uuid, &resp.payload[i], sizeof(user_uuid));
 		i += sizeof(user_uuid);
-		//user_info = clients[UuidToStr(user_uuid)];
 		user_info = clients [clientsIdToUsername[UuidToStr(user_uuid)]];
 		std::memcpy(&message_id, &resp.payload[i], sizeof(message_id));
 		i += sizeof(message_id);
@@ -303,8 +273,6 @@ Response MessageU::getMessages()
 
 		if (user_info == NULL)
 		{
-			//std::cout << "unknown client '" << UuidToStr(user_uuid) << "' please get clients list" << std::endl << std::endl;
-			//std::cout << "unkown user '" << user_info->getUserName() << "', try to get client list again" << std::endl;
 			std::string err_msg = "unknown user '" + user_info->getUserName() + "' please get clients list";
 			throw std::exception(err_msg.c_str());
 		}
@@ -338,21 +306,14 @@ Response MessageU::getMessages()
 	}
 	return resp;
 }
-Response MessageU::sendMessage(std::string client_username, messageType message_type, std::string content)
+Response MessageU::sendMessage(ClientInfo* user_info, messageType message_type, std::string content)
 {
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::sendMessage);
 	req.client_id = client_id;
 	uint32_t content_size = content.length();
-	ClientInfo* user_info = clients[client_username];
-	if (user_info == NULL)
-	{
-		//std::cout << "unkown user '" << user_info->getUserName() << "', try to get client list again" << std::endl;
-		std::string err_msg = "unknown user '" + user_info->getUserName() + "' please get clients list";
-		throw std::exception(err_msg.c_str());
-	}
-	UUID dst_client_id = clients[client_username]->getId();
+	UUID dst_client_id = user_info->getId();
 	uint8_t message_type_id = uint8_t(message_type);
 	req.payload_size = sizeof(dst_client_id) + sizeof(message_type_id) + sizeof(content_size) + content_size;
 	req.payload = new char[req.payload_size]();
@@ -364,7 +325,20 @@ Response MessageU::sendMessage(std::string client_username, messageType message_
 	return resp;
 }
 
-
+ClientInfo* MessageU::getClientInput()
+{
+	std::string client_username;
+	std::cout << "enter client username: ";
+	std::cin.ignore(); // flushing the input buffer
+	std::getline(std::cin, client_username);
+	ClientInfo* dst_client = clients[client_username];
+	if (dst_client == NULL)
+	{
+		std::string err_msg = "unknown client '" + client_username + "' please get clients list";
+		throw std::exception(err_msg.c_str());
+	}
+	return dst_client;
+}
 
 // TODO think where to put this func and add comments
 std::string MessageU::hexStr(unsigned char* data, int len)

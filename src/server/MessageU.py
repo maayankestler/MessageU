@@ -91,6 +91,12 @@ class MessageU:
             msgs.append(msg)
         return msgs
 
+    def delete_messages(self, msgs):
+        with sqlite3.connect(self.db_file) as connection:
+            with closing(connection.cursor()) as cursor:
+                for msg in msgs:
+                    cursor.execute('DELETE FROM messages WHERE ID=:id', {"id": msg.message_id})
+
 
 class User:
     def __init__(self, username, client_id=None,  pubkey=None, last_seen=None):
