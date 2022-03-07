@@ -21,17 +21,14 @@ int main()
 		}
 		else
 		{
-			choice = InputEnum::userInput(user_input); // TODO handle invalid input
-			if (choice == InputEnum::userInput::exitApp) // TODO check if can be done at handleInput
-				break;
-			else
+			choice = InputEnum::userInput(user_input);
+			resp = app.handleInput(choice);
+			if (resp.code == int(responseCode::generalError))
 			{
-				resp = app.handleInput(choice);
-				if (resp.code == int(responseCode::generalError))
-				{
-					std::cout << "server responded with an error" << std::endl;
-				}
+				std::cout << "server responded with an error" << std::endl;
 			}
+			if (choice == InputEnum::userInput::exitApp)
+				break;
 		}
 		std::cout << std::endl;
 	}

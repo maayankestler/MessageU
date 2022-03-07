@@ -2,7 +2,7 @@
 
 MessageU::MessageU()
 {
-	std::string server_address = fileToString(SERVER_CONFIG_PATH);
+	std::string server_address = FileUtils::fileToString(SERVER_CONFIG_PATH);
 	int split_index = server_address.find(":");
 	if (split_index == std::string::npos) {
 		throw std::invalid_argument(SERVER_CONFIG_PATH + " not in the right format");
@@ -12,7 +12,7 @@ MessageU::MessageU()
 	serverPort = std::stoi(port_str);
 	try
 	{
-		std::string myinfo = fileToString(USER_INFO_PATH);
+		std::string myinfo = FileUtils::fileToString(USER_INFO_PATH);
 		std::string b64private_key_str, client_id_str;
 
 		std::stringstream ss(myinfo);
@@ -20,7 +20,7 @@ MessageU::MessageU()
 		std::getline(ss, client_id_str, '\n');
 		ss << ss.rdbuf();
 		b64private_key_str = ss.str();
-		client_id = StrToUuid(client_id_str);
+		client_id = StringUtils::StrToUuid(client_id_str);
 		std::string private_key_str = Base64Wrapper::decode(b64private_key_str);
 		privateKey = new RSAPrivateWrapper(private_key_str);
 		std::string publicKey_str = privateKey->getPublicKey();
@@ -44,7 +44,7 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		{
 		case InputEnum::userInput::registertion:
 		{
-			if (fileExist(USER_INFO_PATH))
+			if (FileUtils::fileExist(USER_INFO_PATH))
 			{
 				throw std::exception("you are already registered (user info file already exist)");
 			}
@@ -79,7 +79,6 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			AESWrapper* sym_key = dst_client->getSymKey();
 			if (sym_key == NULL)
 			{
-				//std::cout << "can’t decrypt message" << std::endl;
 				throw std::exception("can’t decrypt message");
 			}
 			std::string text_message;
@@ -113,9 +112,22 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		case InputEnum::userInput::sendFile:
 		{
 			ClientInfo* dst_client = getClientInput();
+			AESWrapper* sym_key = dst_client->getSymKey();
+			if (sym_key == NULL)
+			{
+				throw std::exception("can't decrypt message");
+			}
+			std::string file_path;
+			std::cout << "enter file path: ";
+			//std::cin.ignore(); // flushing the input buffer
+			std::getline(std::cin, file_path);
+			std::string file_content = FileUtils::fileToString(file_path);
+			std::string file_content_encrypted = sym_key->encrypt(file_content.c_str(), file_content.length());
+			resp = sendMessage(dst_client, messageType::sendFile, file_content_encrypted);
 			break;
 		}
 		case InputEnum::userInput::exitApp:
+			// TODO free some memory
 			break;
 		default:
 			std::cout << "Unkown option: " << int(choice) << std::endl;
@@ -175,7 +187,7 @@ Response MessageU::registerUser(std::string userName)
 	{
 		username = userName;
 		std::memcpy(&client_id, resp.payload, sizeof(UUID));
-		std::string client_id_str = UuidToStr(client_id);
+		std::string client_id_str = StringUtils::UuidToStr(client_id);
 		std::ofstream myfile;
 		myfile.open(USER_INFO_PATH);
 		myfile << userName << std::endl << client_id_str << std::endl << Base64Wrapper::encode(private_key_str);
@@ -198,7 +210,7 @@ Response MessageU::getCLientList()
 	for (uint32_t i = 0; i < resp.payload_size; i += MAX_USERNAME_LENGTH + sizeof(UUID))
 	{
 		std::memcpy(&user_uuid, &resp.payload[i], sizeof(UUID));
-		std::string user_uuid_str = UuidToStr(user_uuid);
+		std::string user_uuid_str = StringUtils::UuidToStr(user_uuid);
 		std::cout << user_uuid_str << " | ";
 		std::string user_username(&resp.payload[i + sizeof(UUID)]);
 		std::cout << user_username << std::endl;
@@ -241,8 +253,6 @@ Response MessageU::getMessages()
 	req.payload_size = 0;
 	Response resp = req.sendRequset(serverIp, serverPort);
 
-	
-	// TODO create message class????
 	UUID user_uuid;
 	uint32_t message_id;
 	uint8_t message_type_id;
@@ -255,7 +265,7 @@ Response MessageU::getMessages()
 	{
 		std::memcpy(&user_uuid, &resp.payload[i], sizeof(user_uuid));
 		i += sizeof(user_uuid);
-		user_info = clients [clientsIdToUsername[UuidToStr(user_uuid)]];
+		user_info = clients [clientsIdToUsername[StringUtils::UuidToStr(user_uuid)]];
 		std::memcpy(&message_id, &resp.payload[i], sizeof(message_id));
 		i += sizeof(message_id);
 		std::memcpy(&message_type_id, &resp.payload[i], sizeof(message_type_id));
@@ -283,7 +293,17 @@ Response MessageU::getMessages()
 			switch (message_type)
 			{
 			case messageType::sendFile:
+			{
+				std::string file_content = user_info->getSymKey()->decrypt(content, message_size);
+				char* temp_dir_envar;
+				size_t len;
+				errno_t err = _dupenv_s(&temp_dir_envar, &len, "TMP");
+				std::string path = std::string(temp_dir_envar, len - 1);
+				path += "\\temp.info";
+				FileUtils::stringToFile(file_content, path);
+				std::cout << "file saved in path: " << path << std::endl;
 				break;
+			}
 			case messageType::requestSymKey:
 				std::cout << "Request for symmetric key" << std::endl;
 				break;
@@ -338,36 +358,4 @@ ClientInfo* MessageU::getClientInput()
 		throw std::exception(err_msg.c_str());
 	}
 	return dst_client;
-}
-
-// TODO think where to put this func and add comments
-std::string MessageU::hexStr(unsigned char* data, int len)
-{
-	std::stringstream ss;
-	ss << std::hex;
-	for (int i = 0; i < len; ++i)
-		ss << std::setw(2) << std::setfill('0') << (int)data[i];
-	return ss.str();
-}
-
-// TODO think where to put this func
-std::string MessageU::UuidToStr(UUID uuid)
-{
-	std::stringstream ss;
-	ss << std::hex << std::setw(sizeof(uuid.Data1) * 2) << std::setfill('0') << uuid.Data1;
-	ss << std::hex << std::setw(sizeof(uuid.Data2) * 2) << std::setfill('0') << uuid.Data2;
-	ss << std::hex << std::setw(sizeof(uuid.Data3) * 2) << std::setfill('0') << uuid.Data3;
-	ss << hexStr(uuid.Data4, sizeof(uuid.Data4));
-	return ss.str();
-}
-
-// TODO think where to put this func
-UUID MessageU::StrToUuid(std::string uuid_str)
-{
-	UUID uuid;
-	// add "-" to match the UuidFromString convention
-	for (int i = 8;i < 24;i += 5) // TODO handle magic numbers
-		uuid_str.insert(i, "-");
-	UuidFromStringA((RPC_CSTR)uuid_str.c_str(), &uuid);
-	return uuid;
 }

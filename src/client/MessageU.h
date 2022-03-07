@@ -4,11 +4,13 @@
 #include <sstream>
 #include <iomanip>
 #include "filesutils.h"
+#include "StringUtils.h"
 #include "Protocol.h"
 #include "RSAWrapper.h"
 #include "Base64Wrapper.h"
 #include "AESWrapper.h"
 #include "ClientInfo.h"
+#include "Message.h"
 
 #pragma comment(lib, "rpcrt4.lib")
 
@@ -59,18 +61,9 @@ private:
     RSAPrivateWrapper* privateKey;
     RSAPublicWrapper* publicKey;
     static std::string optionToText(InputEnum::userInput option);
-    static std::string hexStr(unsigned char* data, int len);
-    static std::string UuidToStr(UUID uuid);
-    static UUID StrToUuid(std::string uuid_str);
     Response registerUser(std::string userName);
     Response getCLientList();
     Response getPubKey(ClientInfo* user_info);
-    enum class messageType {
-        requestSymKey = 1,
-        sendSymKey = 2,
-        sendText = 3,
-        sendFile = 4,
-    };
     Response getMessages();
     Response sendMessage(ClientInfo* user_info, messageType type, std::string content);
     std::map<std::string, ClientInfo*> clients;

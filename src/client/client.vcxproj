@@ -160,6 +160,7 @@
     <ClCompile Include="filesutils.cpp" />
     <ClCompile Include="MessageU.cpp" />
     <ClCompile Include="Protocol.cpp" />
+    <ClCompile Include="StringUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClientInfo.h" />
@@ -169,6 +170,7 @@
     <ClInclude Include="filesutils.h" />
     <ClInclude Include="MessageU.h" />
     <ClInclude Include="Protocol.h" />
+    <ClInclude Include="StringUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="server.info" />
