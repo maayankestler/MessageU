@@ -64,6 +64,7 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			break;
 		case InputEnum::userInput::getPubKey:
 		{
+			// TODO change to username
 			std::string client_id_str;
 			std::cout << "enter client id: ";
 			std::cin.ignore(); // flushing the input buffer
@@ -92,8 +93,16 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			std::cout << "enter text: ";
 			std::getline(std::cin, text_message);
 			ClientInfo* dst_client = clients[client_id_str];
-			std::string text_message_encrypted = dst_client->getSymKey()->encrypt(text_message.c_str(), text_message.length());
-			resp = sendMessage(client_id_str, messageType::sendText, text_message_encrypted);
+			AESWrapper* sym_key = dst_client->getSymKey();
+			if (sym_key == NULL)
+			{
+				std::cout << "can’t decrypt message" << std::endl;
+			}
+			else
+			{
+				std::string text_message_encrypted = sym_key->encrypt(text_message.c_str(), text_message.length());
+				resp = sendMessage(client_id_str, messageType::sendText, text_message_encrypted);
+			}
 			break;
 		}
 		case InputEnum::userInput::requestSymKey:
@@ -163,38 +172,19 @@ void MessageU::printMenu() {
 
 std::string MessageU::optionToText(InputEnum::userInput option)
 {
-	std::string text = "";
 	switch (option)
 	{
-	case InputEnum::userInput::registertion:
-		text = "Register";
-		break;
-	case InputEnum::userInput::clientsList:
-		text = "Request for clients list";
-		break;
-	case InputEnum::userInput::getPubKey:
-		text = "Request for public key";
-		break;
-	case InputEnum::userInput::getMessages:
-		text = "Request for waiting messages";
-		break;
-	case InputEnum::userInput::sendMessage:
-		text = "Send a text message";
-		break;
-	case InputEnum::userInput::requestSymKey:
-		text = "Send a request for symmetric key";
-		break;
-	case InputEnum::userInput::sendSymKey:
-		text = "Send your symmetric key";
-		break;
-	case InputEnum::userInput::exitApp:
-		text = "Exit client";
-		break;
-	default:
-		text = "invalid option";
-		break;
+	case InputEnum::userInput::registertion: return "Register";
+	case InputEnum::userInput::clientsList: return "Request for clients list";
+	case InputEnum::userInput::getPubKey: return "Request for public key";
+	case InputEnum::userInput::getMessages: return "Request for waiting messages";
+	case InputEnum::userInput::sendMessage: return "Send a text message";
+	case InputEnum::userInput::requestSymKey: return "Send a request for symmetric key";
+	case InputEnum::userInput::sendSymKey: return "Send your symmetric key";
+	case InputEnum::userInput::sendFile: return "Send a file";
+	case InputEnum::userInput::exitApp: return "Exit client";
+	default: return "invalid option";
 	}
-	return text;
 }
 
 Response MessageU::registerUser(std::string userName)
@@ -398,4 +388,3 @@ UUID MessageU::StrToUuid(std::string uuid_str)
 	UuidFromStringA((RPC_CSTR)uuid_str.c_str(), &uuid);
 	return uuid;
 }
-

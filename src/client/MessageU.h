@@ -1,6 +1,8 @@
 #pragma once
 #include <iostream>
 #include <map>
+#include <sstream>
+#include <iomanip>
 #include "filesutils.h"
 #include "Protocol.h"
 #include "RSAWrapper.h"
@@ -25,6 +27,7 @@ namespace InputEnum
         sendMessage = 150,
         requestSymKey = 151,
         sendSymKey = 152,
+        sendFile = 153,
         exitApp = 0
     };
 
@@ -36,6 +39,7 @@ namespace InputEnum
         userInput::sendMessage,
         userInput::requestSymKey,
         userInput::sendSymKey,
+        userInput::sendFile,
         userInput::exitApp
     };
 }

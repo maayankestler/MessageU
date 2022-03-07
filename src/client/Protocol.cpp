@@ -48,11 +48,11 @@ Response Request::sendRequset(std::string ip, int port)
         ConnectSocket = INVALID_SOCKET;
     }
     iResult = send(ConnectSocket, request_bytes, this->bytes_amount, 0);
+    delete request_bytes;
     if (iResult == SOCKET_ERROR) {
         printf("send failed with error: %d\n", WSAGetLastError());
         closesocket(ConnectSocket);
     }
-    //printf("Bytes Sent: %ld\n", iResult);
     //iResult = shutdown(ConnectSocket, SD_SEND);
     //if (iResult == SOCKET_ERROR) {
     //    printf("shutdown failed with error: %d\n", WSAGetLastError());
@@ -61,14 +61,12 @@ Response Request::sendRequset(std::string ip, int port)
     //}
     char* response_bytes = new char[MAX_LENGTH];
     iResult = recv(ConnectSocket, response_bytes, MAX_LENGTH, 0);
-    //printf("Bytes recived: %ld\n", iResult);
-    return Response::processResponse(response_bytes, MAX_LENGTH);
     closesocket(ConnectSocket);
     WSACleanup();
-    return Response();
+    return Response::processResponse(response_bytes, MAX_LENGTH);
 }
 
-Response Response::processResponse(char serverdata[], int length)
+Response Response::processResponse(char* serverdata, int length)
 {
     //Response resp = Response(); // TODO check {0}
     Response(resp); // TODO check if valid
@@ -83,8 +81,8 @@ Response Response::processResponse(char serverdata[], int length)
         resp.bytes_amount += sizeof(resp.payload_size);
         resp.payload = new char[resp.payload_size + 1];
         std::memcpy(resp.payload, &serverdata[resp.bytes_amount], resp.payload_size);
-        //strncpy_s(resp.payload, resp.size + 1, &clientdata[i], resp.size);
         resp.bytes_amount += resp.payload_size;
     }
+    delete serverdata;
     return resp;
 }
