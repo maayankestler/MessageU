@@ -17,11 +17,6 @@
 
 #pragma comment(lib, "rpcrt4.lib")
 
-const std::string WELCOME_MESSAGE = "MessageU client at your service.";
-const std::string SERVER_CONFIG_PATH = "server.info";
-const std::string USER_INFO_PATH = "my.info";
-const uint8_t VERSION = 1;
-
 namespace InputEnum
 {
     enum class userInput {
@@ -55,6 +50,11 @@ public:
     MessageU();
     static void printMenu();
     Response handleInput(InputEnum::userInput choice);
+    inline static const std::string WELCOME_MESSAGE = "MessageU client at your service.";
+    inline static const std::string SERVER_CONFIG_PATH = "server.info";
+    inline static const std::string USER_INFO_PATH = "my.info";
+    const int MAX_USERNAME_LENGTH = 255;
+    static const uint8_t VERSION = 2;
 
 private:
     std::string serverIp;

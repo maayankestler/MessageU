@@ -7,12 +7,10 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <algorithm>
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
-
-const int MAX_LENGTH = 1024 * 1024 * 100;
-const int MAX_USERNAME_LENGTH = 255;
 
 enum class responseCode {
     registertion = 2100,
@@ -39,9 +37,11 @@ private:
     uint16_t _code{};
     uint32_t _payload_size{};
     char* _payload{};
-
+    static const int HEADER_SIZE = sizeof(_version) + sizeof(_code) + sizeof(_payload_size);
+    static const int CHUNK_SIZE = 256;
+    static Response processResponseHeader(char serverdata[HEADER_SIZE]);
 public:
-    static Response processResponse(char* clientdata, int length);
+    static Response processResponse(SOCKET ConnectSocket);
 
     void setPayload(char* payload) {
         _payload = payload;
@@ -91,6 +91,7 @@ private:
     uint16_t _code{};
     uint32_t _payload_size{};
     char* _payload{};
+    const int HEADER_SIZE = sizeof(_client_id) + sizeof(_version) + sizeof(_code) + sizeof(_payload_size);
 public:
     Request(UUID client_id, uint8_t version, requestCode _code, uint32_t _payload_size, char* _payload = NULL);
     char* getRequestBytes();

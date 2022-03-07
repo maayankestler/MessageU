@@ -76,8 +76,7 @@ class Server:
         try:
             with conn:
                 logging.info(f'Connected by {addr}')
-                data = conn.recv(buff_size)
-                req = Request.process_request(data)
+                req = Request.process_request(conn)
                 try:
                     resp = self.code_to_func[req.code](req)
                 except KeyError:

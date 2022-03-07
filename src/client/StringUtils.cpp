@@ -24,8 +24,11 @@ std::string StringUtils::UuidToStr(UUID uuid)
 UUID StringUtils::StrToUuid(std::string uuid_str)
 {
 	UUID uuid;
-	// add "-" to match the UuidFromString convention
-	for (int i = 8;i < 24;i += 5) // TODO handle magic numbers
+	// add "-" to seperte the hex groups and match the UuidFromString convention
+	int bytes_to_hex_ratio = CHAR_BIT / 4; // one bye have CHAR_BIT bits and each hex char is 4 bits
+	int first_group_len = sizeof(uuid.Data1) * bytes_to_hex_ratio;
+	int midlle_groups_len = sizeof(uuid.Data2) * bytes_to_hex_ratio;
+	for (int i = first_group_len;i < first_group_len + 4 * midlle_groups_len;i += midlle_groups_len + 1)
 		uuid_str.insert(i, "-");
 	UuidFromStringA((RPC_CSTR)uuid_str.c_str(), &uuid);
 	return uuid;

@@ -14,6 +14,7 @@ class RequestCode(Enum):
 
 class Request:
     client_id_size = 16  # the size in bytes of client_id
+    _chunk_size = 256
 
     def __init__(self, client_id, version, code, payload_size=0, payload=""):
         self.client_id = uuid.UUID(bytes_le=client_id)
@@ -27,17 +28,22 @@ class Request:
                f"code: {self.code.value} payload: {self.payload}"
 
     @staticmethod
-    def process_request(data_bytes):
+    def process_request(conn):
         # read client id, Version, Code and Payload size
         pack_format = f"<{Request.client_id_size}sBHI"
-        data = struct.unpack(pack_format, data_bytes[:struct.calcsize(pack_format)])
+        header_bytes = conn.recv(struct.calcsize(pack_format))
+        data = struct.unpack(pack_format, header_bytes)
         i = struct.calcsize(pack_format)
         payload_size = data[-1]
 
         # if there is a payload
         if payload_size:
+            payload_bytes = bytes()
+            for i in range(0, payload_size, Request._chunk_size):
+                read_size = min(Request._chunk_size, payload_size - i)
+                payload_bytes += conn.recv(read_size)
             pack_format = f"<{payload_size}s"
-            data += struct.unpack(pack_format, data_bytes[i:i + struct.calcsize(pack_format)])
+            data += struct.unpack(pack_format, payload_bytes)
         req = Request(*data)
         return req
 
@@ -52,13 +58,6 @@ class ResponseCode(Enum):
 
 
 class Response:
-
-    # TODO check if param or property func
-    @property
-    def _max_response_size(self):
-        # _max_response_size = 4096
-        return 4096
-
     def __init__(self, version, code=-1, payload=""):
         self.version = version
         try:

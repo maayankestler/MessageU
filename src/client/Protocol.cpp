@@ -11,7 +11,7 @@ Request::Request(UUID client_id, uint8_t version, requestCode _code, uint32_t _p
 
 char* Request::getRequestBytes()
 {
-    char* request_data = new char[MAX_LENGTH];
+    char* request_data = new char[HEADER_SIZE + _payload_size];
     _bytes_amount = 0;
 
     if (request_data)
@@ -39,14 +39,14 @@ Response Request::sendRequset(std::string ip, int port)
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
-        std::cout << "WSAStartup failed with error: " << iResult << std::endl;
-        // TODO return null or something
+        std::string err_msg = "WSAStartup failed with error: " + iResult;
+        throw std::exception(err_msg.c_str());
     }
     SOCKET ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (ConnectSocket == INVALID_SOCKET) {
-        printf("Error at socket(): %ld\n", WSAGetLastError());
+        std::string err_msg = "Error at socket(): " + WSAGetLastError();
+        throw std::exception(err_msg.c_str());
     }
-    char* request_bytes = getRequestBytes();
     struct sockaddr_in saServer;
     saServer.sin_family = AF_INET;
     inet_pton(AF_INET, ip.c_str(), &saServer.sin_addr.s_addr);
@@ -55,43 +55,53 @@ Response Request::sendRequset(std::string ip, int port)
     if (iResult == SOCKET_ERROR) {
         closesocket(ConnectSocket);
         ConnectSocket = INVALID_SOCKET;
+        std::string err_msg = "failed to connect";
+        throw std::exception(err_msg.c_str());
     }
+    char* request_bytes = getRequestBytes();
     iResult = send(ConnectSocket, request_bytes, _bytes_amount, 0);
     delete request_bytes;
     if (iResult == SOCKET_ERROR) {
-        printf("send failed with error: %d\n", WSAGetLastError());
         closesocket(ConnectSocket);
+        std::string err_msg = "send failed with error: " + WSAGetLastError();
+        throw std::exception(err_msg.c_str());
     }
-    //iResult = shutdown(ConnectSocket, SD_SEND);
-    //if (iResult == SOCKET_ERROR) {
-    //    printf("shutdown failed with error: %d\n", WSAGetLastError());
-    //    closesocket(ConnectSocket);
-    //    WSACleanup();
-    //}
-    char* response_bytes = new char[MAX_LENGTH];
-    iResult = recv(ConnectSocket, response_bytes, MAX_LENGTH, 0);
+    iResult = shutdown(ConnectSocket, SD_SEND);
+    if (iResult == SOCKET_ERROR) {
+        std::string err_msg = "shutdown failed with error: " + WSAGetLastError();
+        closesocket(ConnectSocket);
+        WSACleanup();
+        throw std::exception(err_msg.c_str());
+    }
+    Response resp = Response::processResponse(ConnectSocket);
     closesocket(ConnectSocket);
     WSACleanup();
-    return Response::processResponse(response_bytes, MAX_LENGTH);
+    return resp;
 }
 
-Response Response::processResponse(char* serverdata, int length)
+Response Response::processResponse(SOCKET ConnectSocket)
 {
-    //Response resp = Response(); // TODO check {0}
-    Response(resp); // TODO check if valid
+    char* header_bytes = new char[Response::HEADER_SIZE];
+    int recived_bytes = recv(ConnectSocket, header_bytes, Response::HEADER_SIZE, 0);
+    Response resp = Response::processResponseHeader(header_bytes);
+    resp._payload = new char[resp._payload_size]();
+    for (uint32_t i = 0;i < resp._payload_size;i += CHUNK_SIZE)
+    {
+        int read_size = std::min<int>(CHUNK_SIZE, resp._payload_size - i);
+        recived_bytes = recv(ConnectSocket, &resp._payload[i], read_size, 0);
+    }
+    return resp;
+}
+
+Response Response::processResponseHeader(char serverdata[HEADER_SIZE])
+{
+    Response(resp);
     resp._bytes_amount = 0;
     std::memcpy(&resp._version, &serverdata[resp._bytes_amount], sizeof(resp._version));
     resp._bytes_amount += sizeof(resp._version);
     std::memcpy(&resp._code, &serverdata[resp._bytes_amount], sizeof(resp._code));
     resp._bytes_amount += sizeof(resp._code);
-    if (length > resp._bytes_amount)
-    {
-        std::memcpy(&resp._payload_size, &serverdata[resp._bytes_amount], sizeof(resp._payload_size));
-        resp._bytes_amount += sizeof(resp._payload_size);
-        resp._payload = new char[resp._payload_size + 1];
-        std::memcpy(resp._payload, &serverdata[resp._bytes_amount], resp._payload_size);
-        resp._bytes_amount += resp._payload_size;
-    }
-    delete serverdata;
+    std::memcpy(&resp._payload_size, &serverdata[resp._bytes_amount], sizeof(resp._payload_size));
+    resp._bytes_amount += sizeof(resp._payload_size);
     return resp;
 }
