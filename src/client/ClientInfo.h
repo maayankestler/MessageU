@@ -5,10 +5,9 @@
 
 class ClientInfo
 {
-    // TOD add getters and setters??????
 private:
     std::string _username;
-    //UUID client_id;
+    UUID _id;
     RSAPublicWrapper* _publicKey;
     AESWrapper* _symKey;
 public:
@@ -22,11 +21,20 @@ public:
         return _username;
     }
 
+    void setId(UUID id)
+    {
+        _id = id;
+    }
+
+    UUID getId()
+    {
+        return _id;
+    }
+
     void setPubKey(RSAPublicWrapper* pubkey)
     {
-        //_publicKey = new RSAPublicWrapper(pubkey.getPublicKey());
-        delete _publicKey; // TODO check if delete is neccery
-        _publicKey = pubkey; // TODO check if pointer setter is OK
+        delete _publicKey;
+        _publicKey = pubkey;
     }
 
     RSAPublicWrapper* getPubKey()
@@ -36,6 +44,7 @@ public:
 
     void setSymKey(unsigned char* key)
     {
+        delete _symKey;
         _symKey = new AESWrapper(key, AESWrapper::DEFAULT_KEYLENGTH);
     }
 

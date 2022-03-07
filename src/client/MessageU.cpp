@@ -49,7 +49,7 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 				throw std::exception("you are already registered (user info file already exist)");
 			}
 			std::string username;
-			std::cout << "enter username: ";
+			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
 			std::getline(std::cin, username);
 			if (username.length() > MAX_USERNAME_LENGTH - 1)
@@ -65,18 +65,11 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		case InputEnum::userInput::getPubKey:
 		{
 			// TODO change to username
-			std::string client_id_str;
-			std::cout << "enter client id: ";
+			std::string username;
+			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_id_str);
-
-			// verify the input size
-			//the length of the uuid string it's the size in bits divided by the bits to hex digit ratio (4)
-			if (client_id_str.length() != sizeof(UUID) * CHAR_BIT / 4)
-			{
-				throw std::exception("wrong input size");
-			}
-			resp = getPubKey(client_id_str);
+			std::getline(std::cin, username);
+			resp = getPubKey(username);
 			break;
 		}
 		case InputEnum::userInput::getMessages:
@@ -86,64 +79,61 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		}
 		case InputEnum::userInput::sendMessage:
 		{
-			std::string client_id_str, text_message;
-			std::cout << "enter client id: ";
+			std::string client_username, text_message;
+			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_id_str);
-			std::cout << "enter text: ";
-			std::getline(std::cin, text_message);
-			ClientInfo* dst_client = clients[client_id_str];
+			std::getline(std::cin, client_username);
+			ClientInfo* dst_client = clients[client_username];
+			if (dst_client == NULL)
+			{
+				std::string err_msg = "unknown client '" + client_username + "' please get clients list";
+				throw std::exception(err_msg.c_str());
+			}
 			AESWrapper* sym_key = dst_client->getSymKey();
 			if (sym_key == NULL)
 			{
-				std::cout << "can’t decrypt message" << std::endl;
+				//std::cout << "can’t decrypt message" << std::endl;
+				throw std::exception("can’t decrypt message");
 			}
-			else
-			{
-				std::string text_message_encrypted = sym_key->encrypt(text_message.c_str(), text_message.length());
-				resp = sendMessage(client_id_str, messageType::sendText, text_message_encrypted);
-			}
+			std::cout << "enter text: ";
+			std::getline(std::cin, text_message);
+			std::string text_message_encrypted = sym_key->encrypt(text_message.c_str(), text_message.length());
+			resp = sendMessage(client_username, messageType::sendText, text_message_encrypted);	
 			break;
 		}
 		case InputEnum::userInput::requestSymKey:
 		{
-			std::string client_id_str;
-			std::cout << "enter client id: ";
+			std::string client_username;
+			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_id_str);
-			resp = sendMessage(client_id_str, messageType::requestSymKey, "");
+			std::getline(std::cin, client_username);
+			resp = sendMessage(client_username, messageType::requestSymKey, "");
 			break;
 		}
 		case InputEnum::userInput::sendSymKey:
 		{
-			std::string client_id_str;
-			std::cout << "enter client id: ";
+			std::string client_username;
+			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
-			std::getline(std::cin, client_id_str);
+			std::getline(std::cin, client_username);
 			// generate Sym Key
 			unsigned char key[AESWrapper::DEFAULT_KEYLENGTH];
 			AESWrapper::GenerateKey(key, AESWrapper::DEFAULT_KEYLENGTH);
 			//AESWrapper aes(key, AESWrapper::DEFAULT_KEYLENGTH);
-			ClientInfo* dst_client = clients[client_id_str];
+			ClientInfo* dst_client = clients[client_username];
 			if (dst_client == NULL)
 			{
-				std::cout << "unknown client '" << client_id_str << "' please get clients list" << std::endl << std::endl;
+				std::string err_msg = "unknown client '" + client_username + "' please get clients list";
+				throw std::exception(err_msg.c_str());
 			}
-			else
+			dst_client->setSymKey(key);
+			if (dst_client->getPubKey() == NULL)
 			{
-				dst_client->setSymKey(key);
-
-				//std::string((const char*)key, AESWrapper::DEFAULT_KEYLENGTH);
-				if (dst_client->getPubKey() == NULL)
-				{
-					std::cout << "unknown public key for '" << client_id_str << "' please request public key" << std::endl << std::endl;
-				}
-				else
-				{
-					std::string sym_key = dst_client->getPubKey()->encrypt((const char*)key, AESWrapper::DEFAULT_KEYLENGTH);
-					resp = sendMessage(client_id_str, messageType::sendSymKey, sym_key);
-				}
+				std::string err_msg = "unknown public key for '" + client_username + "' please request public key";
+				throw std::exception(err_msg.c_str());
 			}
+			std::string sym_key = dst_client->getPubKey()->encrypt((const char*)key, AESWrapper::DEFAULT_KEYLENGTH);
+			resp = sendMessage(client_username, messageType::sendSymKey, sym_key);
 			break;
 		}
 		case InputEnum::userInput::exitApp:
@@ -217,7 +207,7 @@ Response MessageU::registerUser(std::string userName)
 }
 Response MessageU::getCLientList()
 {
-	Request(req);
+	Request(req); // TODO init with constructor
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::users_list);
 	req.client_id = client_id;
@@ -233,21 +223,31 @@ Response MessageU::getCLientList()
 		std::cout << user_uuid_str << " | ";
 		std::string user_username(&resp.payload[i + sizeof(UUID)]);
 		std::cout << user_username << std::endl;
-		if (clients[user_uuid_str] == NULL)
+		clientsIdToUsername[user_uuid_str] = user_username;
+		if (clients[user_username] == NULL)
 		{
-			clients[user_uuid_str] = new ClientInfo();
-			clients[user_uuid_str]->setUserName(user_username);
+			clients[user_username] = new ClientInfo();
+			clients[user_username]->setUserName(user_username);
+			clients[user_username]->setId(user_uuid);
 		}
 	}
 	return resp;
 }
-Response MessageU::getPubKey(std::string client_id_str)
+Response MessageU::getPubKey(std::string client_username)
 {
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::getPubKey);
 	req.client_id = client_id;
-	UUID dst_client_id = StrToUuid(client_id_str);
+	//UUID dst_client_id = StrToUuid(client_id_str);
+	ClientInfo* user_info = clients[client_username];
+	if (user_info == NULL)
+	{
+		std::string err_msg = "unknown client '" + client_username + "' please get clients list";
+		throw std::exception(err_msg.c_str());
+		//std::cout << "unkown user '" << client_username << "', try to get client list again" << std::endl;
+	}
+	UUID dst_client_id = user_info->getId();
 	req.payload_size = sizeof(dst_client_id);
 	req.payload = new char[req.payload_size]();
 	std::memcpy(req.payload, &dst_client_id, sizeof(dst_client_id));
@@ -257,7 +257,7 @@ Response MessageU::getPubKey(std::string client_id_str)
 		RSAPublicWrapper* dst_pubkey = new RSAPublicWrapper(&resp.payload[sizeof(UUID)], RSAPublicWrapper::KEYSIZE);
 		std::cout << std::endl << "the public key is:" << std::endl;
 		std::cout << Base64Wrapper::encode(dst_pubkey->getPublicKey());
-		clients[client_id_str]->setPubKey(dst_pubkey);
+		user_info->setPubKey(dst_pubkey);
 	}
 	return resp;
 }
@@ -279,12 +279,13 @@ Response MessageU::getMessages()
 	uint32_t message_size;
 	ClientInfo* user_info;
 	char* content = NULL;
-	int i = 0;
+	uint32_t i = 0;
 	while (i < resp.payload_size)
 	{
 		std::memcpy(&user_uuid, &resp.payload[i], sizeof(user_uuid));
 		i += sizeof(user_uuid);
-		user_info = clients[UuidToStr(user_uuid)];
+		//user_info = clients[UuidToStr(user_uuid)];
+		user_info = clients [clientsIdToUsername[UuidToStr(user_uuid)]];
 		std::memcpy(&message_id, &resp.payload[i], sizeof(message_id));
 		i += sizeof(message_id);
 		std::memcpy(&message_type_id, &resp.payload[i], sizeof(message_type_id));
@@ -302,7 +303,10 @@ Response MessageU::getMessages()
 
 		if (user_info == NULL)
 		{
-			std::cout << "unknown client '" << UuidToStr(user_uuid) << "' please get clients list" << std::endl << std::endl;
+			//std::cout << "unknown client '" << UuidToStr(user_uuid) << "' please get clients list" << std::endl << std::endl;
+			//std::cout << "unkown user '" << user_info->getUserName() << "', try to get client list again" << std::endl;
+			std::string err_msg = "unknown user '" + user_info->getUserName() + "' please get clients list";
+			throw std::exception(err_msg.c_str());
 		}
 		else
 		{
@@ -318,8 +322,6 @@ Response MessageU::getMessages()
 			case messageType::sendSymKey:
 			{
 				std::cout << "symmetric key received" << std::endl;
-				//std::cout << Base64Wrapper::encode(publicKey->getPublicKey()) << std::endl << std::endl;
-				//std::cout << hexStr((unsigned char*)content, message_size) << std::endl << std::endl;
 				std::string symkey = privateKey->decrypt(content, message_size);
 				user_info->setSymKey((unsigned char*)symkey.c_str());
 				break;
@@ -336,18 +338,25 @@ Response MessageU::getMessages()
 	}
 	return resp;
 }
-Response MessageU::sendMessage(std::string client_id_str, messageType message_type, std::string content)
+Response MessageU::sendMessage(std::string client_username, messageType message_type, std::string content)
 {
 	Request(req);
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::sendMessage);
 	req.client_id = client_id;
 	uint32_t content_size = content.length();
-	UUID dst_client_id = StrToUuid(client_id_str);
+	ClientInfo* user_info = clients[client_username];
+	if (user_info == NULL)
+	{
+		//std::cout << "unkown user '" << user_info->getUserName() << "', try to get client list again" << std::endl;
+		std::string err_msg = "unknown user '" + user_info->getUserName() + "' please get clients list";
+		throw std::exception(err_msg.c_str());
+	}
+	UUID dst_client_id = clients[client_username]->getId();
 	uint8_t message_type_id = uint8_t(message_type);
 	req.payload_size = sizeof(dst_client_id) + sizeof(message_type_id) + sizeof(content_size) + content_size;
 	req.payload = new char[req.payload_size]();
-	std::memcpy(&req.payload[0], &dst_client_id, sizeof(dst_client_id));
+	std::memcpy(req.payload, &dst_client_id, sizeof(dst_client_id));
 	std::memcpy(&req.payload[sizeof(dst_client_id)], &message_type_id, sizeof(message_type_id));
 	std::memcpy(&req.payload[sizeof(dst_client_id) + sizeof(message_type_id)], &content_size, sizeof(content_size));
 	std::memcpy(&req.payload[sizeof(dst_client_id) + sizeof(message_type_id) + sizeof(content_size)], content.c_str(), content_size);

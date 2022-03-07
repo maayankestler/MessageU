@@ -74,4 +74,5 @@ private:
     Response getMessages();
     Response sendMessage(std::string client_id_str, messageType type, std::string content);
     std::map<std::string, ClientInfo*> clients;
+    std::map<std::string, std::string> clientsIdToUsername;
 };
