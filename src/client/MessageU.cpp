@@ -170,23 +170,18 @@ std::string MessageU::optionToText(InputEnum::userInput option)
 
 Response MessageU::registerUser(std::string userName)
 {
-	Request(req);
-	req.version = VERSION;
-	req.code = uint16_t(requestCode::registertion);
-	req.client_id = UUID();
-	req.payload_size = MAX_USERNAME_LENGTH + RSAPublicWrapper::KEYSIZE;
-	req.payload = new char[req.payload_size]();
-	strncpy_s(req.payload, userName.length() + 1, userName.c_str(), userName.length() + 1);
+	Request req = Request(UUID(), VERSION, requestCode::registertion, MAX_USERNAME_LENGTH + RSAPublicWrapper::KEYSIZE);
+	strncpy_s(req.getPayload(), userName.length() + 1, userName.c_str(), userName.length() + 1);
 	privateKey = new RSAPrivateWrapper();
 	std::string private_key_str = privateKey->getPrivateKey();
 	std::string pubkey_str = privateKey->getPublicKey();
 	publicKey = new RSAPublicWrapper(pubkey_str);
-	std::memcpy(&req.payload[MAX_USERNAME_LENGTH], pubkey_str.c_str(), RSAPublicWrapper::KEYSIZE);
+	std::memcpy(&req.getPayload()[MAX_USERNAME_LENGTH], pubkey_str.c_str(), RSAPublicWrapper::KEYSIZE);
 	Response resp = req.sendRequset(serverIp, serverPort);
-	if (resp.code == int(responseCode::registertion))
+	if (resp.getCode() == responseCode::registertion)
 	{
 		username = userName;
-		std::memcpy(&client_id, resp.payload, sizeof(UUID));
+		std::memcpy(&client_id, resp.getPayload(), sizeof(UUID));
 		std::string client_id_str = StringUtils::UuidToStr(client_id);
 		std::ofstream myfile;
 		myfile.open(USER_INFO_PATH);
@@ -198,21 +193,18 @@ Response MessageU::registerUser(std::string userName)
 }
 Response MessageU::getCLientList()
 {
-	Request(req); // TODO init with constructor
-	req.version = VERSION;
-	req.code = uint16_t(requestCode::users_list);
-	req.client_id = client_id;
+	Request req = Request(client_id, VERSION, requestCode::users_list, 0);
 	Response resp = req.sendRequset(serverIp, serverPort);
 
 	UUID user_uuid;
 	std::cout << "ID" << std::string(30, ' ') << " | username" << std::endl;
 	std::cout << std::string(43, '-') << std::endl;
-	for (uint32_t i = 0; i < resp.payload_size; i += MAX_USERNAME_LENGTH + sizeof(UUID))
+	for (uint32_t i = 0; i < resp.getPayloadSize(); i += MAX_USERNAME_LENGTH + sizeof(UUID))
 	{
-		std::memcpy(&user_uuid, &resp.payload[i], sizeof(UUID));
+		std::memcpy(&user_uuid, &resp.getPayload()[i], sizeof(UUID));
 		std::string user_uuid_str = StringUtils::UuidToStr(user_uuid);
 		std::cout << user_uuid_str << " | ";
-		std::string user_username(&resp.payload[i + sizeof(UUID)]);
+		std::string user_username(&resp.getPayload()[i + sizeof(UUID)]);
 		std::cout << user_username << std::endl;
 		clientsIdToUsername[user_uuid_str] = user_username;
 		if (clients[user_username] == NULL)
@@ -226,18 +218,13 @@ Response MessageU::getCLientList()
 }
 Response MessageU::getPubKey(ClientInfo* user_info)
 {
-	Request(req);
-	req.version = VERSION;
-	req.code = uint16_t(requestCode::getPubKey);
-	req.client_id = client_id;
 	UUID dst_client_id = user_info->getId();
-	req.payload_size = sizeof(dst_client_id);
-	req.payload = new char[req.payload_size]();
-	std::memcpy(req.payload, &dst_client_id, sizeof(dst_client_id));
+	Request req = Request(client_id, VERSION, requestCode::getPubKey, sizeof(dst_client_id));
+	std::memcpy(req.getPayload(), &dst_client_id, sizeof(dst_client_id));
 	Response resp = req.sendRequset(serverIp, serverPort);
-	if (resp.code == int(responseCode::getPubKey))
+	if (resp.getCode() == responseCode::getPubKey)
 	{
-		RSAPublicWrapper* dst_pubkey = new RSAPublicWrapper(&resp.payload[sizeof(UUID)], RSAPublicWrapper::KEYSIZE);
+		RSAPublicWrapper* dst_pubkey = new RSAPublicWrapper(&resp.getPayload()[sizeof(UUID)], RSAPublicWrapper::KEYSIZE);
 		std::cout << std::endl << "the public key is:" << std::endl;
 		std::cout << Base64Wrapper::encode(dst_pubkey->getPublicKey());
 		user_info->setPubKey(dst_pubkey);
@@ -246,14 +233,10 @@ Response MessageU::getPubKey(ClientInfo* user_info)
 }
 Response MessageU::getMessages()
 {
-	Request(req);
-	req.version = VERSION;
-	req.code = uint16_t(requestCode::getMessages);
-	req.client_id = client_id;
-	req.payload_size = 0;
+	Request req = Request(client_id, VERSION, requestCode::getMessages, 0);
 	Response resp = req.sendRequset(serverIp, serverPort);
 
-	std::vector<Message> msgs = Message::ReadMessages(resp.payload, resp.payload_size);
+	std::vector<Message> msgs = Message::ReadMessages(resp.getPayload(), resp.getPayloadSize());
 	for (Message msg : msgs)
 	{
 		ClientInfo* user_info = clients[clientsIdToUsername[StringUtils::UuidToStr(msg.getToClientId())]];
@@ -300,13 +283,8 @@ Response MessageU::getMessages()
 }
 Response MessageU::sendMessage(ClientInfo* user_info, messageType message_type, std::string content)
 {
-	Request(req);
-	req.version = VERSION;
-	req.code = uint16_t(requestCode::sendMessage);
-	req.client_id = client_id;
-	Message msg = Message(user_info->getId(), message_type, content.size(), (char *)content.c_str());
-	req.payload_size = msg.getSizeBytes();
-	req.payload = msg.getBytes();
+	Message msg = Message(user_info->getId(), message_type, content.size(), (char*)content.c_str());
+	Request req = Request(client_id, VERSION, requestCode::sendMessage, msg.getSizeBytes(), msg.getBytes());
 	Response resp = req.sendRequset(serverIp, serverPort);
 	return resp;
 }

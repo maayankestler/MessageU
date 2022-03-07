@@ -23,7 +23,7 @@ int main()
 		{
 			choice = InputEnum::userInput(user_input);
 			resp = app.handleInput(choice);
-			if (resp.code == int(responseCode::generalError))
+			if (resp.getCode() == responseCode::generalError)
 			{
 				std::cout << "server responded with an error" << std::endl;
 			}

@@ -1,24 +1,33 @@
 #include "protocol.h"
 
+Request::Request(UUID client_id, uint8_t version, requestCode _code, uint32_t _payload_size, char* _payload)
+{
+    setClientId(client_id);
+    setVersion(version);
+    setCode(_code);
+    setPayloadSize(_payload_size);
+    setPayload(_payload);
+}
+
 char* Request::getRequestBytes()
 {
     char* request_data = new char[MAX_LENGTH];
-    this->bytes_amount = 0;
+    _bytes_amount = 0;
 
     if (request_data)
     {
-        std::memcpy(&request_data[this->bytes_amount], &this->client_id, sizeof(this->client_id));
-        this->bytes_amount += sizeof(this->client_id);
-        std::memcpy(&request_data[this->bytes_amount], &this->version, sizeof(this->version));
-        this->bytes_amount += sizeof(this->version);
-        std::memcpy(&request_data[this->bytes_amount], &this->code, sizeof(this->code));
-        this->bytes_amount += sizeof(this->code);
-        std::memcpy(&request_data[this->bytes_amount], &this->payload_size, sizeof(this->payload_size));
-        this->bytes_amount += sizeof(this->payload_size);
-        if (this->payload_size != NULL)
+        std::memcpy(&request_data[_bytes_amount], &_client_id, sizeof(_client_id));
+        _bytes_amount += sizeof(_client_id);
+        std::memcpy(&request_data[_bytes_amount], &_version, sizeof(_version));
+        _bytes_amount += sizeof(_version);
+        std::memcpy(&request_data[_bytes_amount], &_code, sizeof(_code));
+        _bytes_amount += sizeof(_code);
+        std::memcpy(&request_data[_bytes_amount], &_payload_size, sizeof(_payload_size));
+        _bytes_amount += sizeof(_payload_size);
+        if (_payload_size != NULL)
         {
-            std::memcpy(&request_data[this->bytes_amount], this->payload, this->payload_size);
-            this->bytes_amount += this->payload_size;
+            std::memcpy(&request_data[_bytes_amount], _payload, _payload_size);
+            _bytes_amount += _payload_size;
         }
     }
 
@@ -37,7 +46,7 @@ Response Request::sendRequset(std::string ip, int port)
     if (ConnectSocket == INVALID_SOCKET) {
         printf("Error at socket(): %ld\n", WSAGetLastError());
     }
-    char* request_bytes = this->getRequestBytes();
+    char* request_bytes = getRequestBytes();
     struct sockaddr_in saServer;
     saServer.sin_family = AF_INET;
     inet_pton(AF_INET, ip.c_str(), &saServer.sin_addr.s_addr);
@@ -47,7 +56,7 @@ Response Request::sendRequset(std::string ip, int port)
         closesocket(ConnectSocket);
         ConnectSocket = INVALID_SOCKET;
     }
-    iResult = send(ConnectSocket, request_bytes, this->bytes_amount, 0);
+    iResult = send(ConnectSocket, request_bytes, _bytes_amount, 0);
     delete request_bytes;
     if (iResult == SOCKET_ERROR) {
         printf("send failed with error: %d\n", WSAGetLastError());
@@ -70,18 +79,18 @@ Response Response::processResponse(char* serverdata, int length)
 {
     //Response resp = Response(); // TODO check {0}
     Response(resp); // TODO check if valid
-    resp.bytes_amount = 0;
-    std::memcpy(&resp.version, &serverdata[resp.bytes_amount], sizeof(resp.version));
-    resp.bytes_amount += sizeof(resp.version);
-    std::memcpy(&resp.code, &serverdata[resp.bytes_amount], sizeof(resp.code));
-    resp.bytes_amount += sizeof(resp.code);
-    if (length > resp.bytes_amount)
+    resp._bytes_amount = 0;
+    std::memcpy(&resp._version, &serverdata[resp._bytes_amount], sizeof(resp._version));
+    resp._bytes_amount += sizeof(resp._version);
+    std::memcpy(&resp._code, &serverdata[resp._bytes_amount], sizeof(resp._code));
+    resp._bytes_amount += sizeof(resp._code);
+    if (length > resp._bytes_amount)
     {
-        std::memcpy(&resp.payload_size, &serverdata[resp.bytes_amount], sizeof(resp.payload_size));
-        resp.bytes_amount += sizeof(resp.payload_size);
-        resp.payload = new char[resp.payload_size + 1];
-        std::memcpy(resp.payload, &serverdata[resp.bytes_amount], resp.payload_size);
-        resp.bytes_amount += resp.payload_size;
+        std::memcpy(&resp._payload_size, &serverdata[resp._bytes_amount], sizeof(resp._payload_size));
+        resp._bytes_amount += sizeof(resp._payload_size);
+        resp._payload = new char[resp._payload_size + 1];
+        std::memcpy(resp._payload, &serverdata[resp._bytes_amount], resp._payload_size);
+        resp._bytes_amount += resp._payload_size;
     }
     delete serverdata;
     return resp;
