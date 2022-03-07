@@ -158,6 +158,7 @@
     <ClCompile Include="cryptopp_wrapper\cryptopp_wrapper\Base64Wrapper.cpp" />
     <ClCompile Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.cpp" />
     <ClCompile Include="filesutils.cpp" />
+    <ClCompile Include="Message.cpp" />
     <ClCompile Include="MessageU.cpp" />
     <ClCompile Include="Protocol.cpp" />
     <ClCompile Include="StringUtils.cpp" />
@@ -168,6 +169,7 @@
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\Base64Wrapper.h" />
     <ClInclude Include="cryptopp_wrapper\cryptopp_wrapper\RSAWrapper.h" />
     <ClInclude Include="filesutils.h" />
+    <ClInclude Include="Message.h" />
     <ClInclude Include="MessageU.h" />
     <ClInclude Include="Protocol.h" />
     <ClInclude Include="StringUtils.h" />

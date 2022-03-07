@@ -1,6 +1,6 @@
 #pragma once
 #include <Windows.h>
-#include "MessageU.h"
+#include <vector>
 
 enum class messageType {
 	requestSymKey = 1,
@@ -16,11 +16,24 @@ private:
 	uint32_t _message_id;
 	uint8_t _message_type_id;
 	uint32_t _message_size;
-	char* content = NULL;
+	char* _content = NULL;
 public:
 	static std::vector<Message> ReadMessages(char* bytes, uint32_t size);
 	Message(UUID user_uuid, uint32_t message_id, uint8_t message_type_id, uint32_t message_size, char* content = NULL);
-	~Message();
+	Message(UUID user_uuid, messageType message_type_id, uint32_t message_size, char* content = NULL);
+	//~Message();
+	char* getBytes();
+	uint32_t getSizeBytes();
+
+	void setContent(char* cont)
+	{
+		_content = cont;
+	}
+
+	char* getContent()
+	{
+		return _content;
+	}
 
 	UUID getToClientId()
 	{

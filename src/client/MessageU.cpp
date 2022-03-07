@@ -253,55 +253,28 @@ Response MessageU::getMessages()
 	req.payload_size = 0;
 	Response resp = req.sendRequset(serverIp, serverPort);
 
-	UUID user_uuid;
-	uint32_t message_id;
-	uint8_t message_type_id;
-	messageType message_type;
-	uint32_t message_size;
-	ClientInfo* user_info;
-	char* content = NULL;
-	uint32_t i = 0;
-	while (i < resp.payload_size)
+	std::vector<Message> msgs = Message::ReadMessages(resp.payload, resp.payload_size);
+	for (Message msg : msgs)
 	{
-		std::memcpy(&user_uuid, &resp.payload[i], sizeof(user_uuid));
-		i += sizeof(user_uuid);
-		user_info = clients [clientsIdToUsername[StringUtils::UuidToStr(user_uuid)]];
-		std::memcpy(&message_id, &resp.payload[i], sizeof(message_id));
-		i += sizeof(message_id);
-		std::memcpy(&message_type_id, &resp.payload[i], sizeof(message_type_id));
-		i += sizeof(message_type_id);
-		message_type = messageType(message_type_id);
-		std::memcpy(&message_size, &resp.payload[i], sizeof(message_size));
-		i += sizeof(message_size);
-		if (message_size > 0)
-		{
-			//delete content;
-			content = new char[message_size]();
-			std::memcpy(content, &resp.payload[i], message_size);
-			i += message_size;
-		}
-
+		ClientInfo* user_info = clients[clientsIdToUsername[StringUtils::UuidToStr(msg.getToClientId())]];
 		if (user_info == NULL)
 		{
-			std::string err_msg = "unknown user '" + user_info->getUserName() + "' please get clients list";
-			throw std::exception(err_msg.c_str());
+			std::string err_msg = "unknown user '" + StringUtils::UuidToStr(msg.getToClientId()) + "' please get clients list";
+			std::cout << err_msg << std::endl;
 		}
 		else
 		{
 			std::cout << "From: " << user_info->getUserName() << std::endl;
 			std::cout << "Content:" << std::endl;
-			switch (message_type)
+			switch (msg.getMessageType())
 			{
 			case messageType::sendFile:
 			{
-				std::string file_content = user_info->getSymKey()->decrypt(content, message_size);
-				char* temp_dir_envar;
-				size_t len;
-				errno_t err = _dupenv_s(&temp_dir_envar, &len, "TMP");
-				std::string path = std::string(temp_dir_envar, len - 1);
-				path += "\\temp.info";
-				FileUtils::stringToFile(file_content, path);
-				std::cout << "file saved in path: " << path << std::endl;
+				std::string file_content = user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize());
+				char temp_path[L_tmpnam_s];
+				tmpnam_s(temp_path, L_tmpnam_s);
+				FileUtils::stringToFile(file_content, std::string(temp_path));
+				std::cout << "file saved in path: " << temp_path << std::endl;
 				break;
 			}
 			case messageType::requestSymKey:
@@ -310,19 +283,18 @@ Response MessageU::getMessages()
 			case messageType::sendSymKey:
 			{
 				std::cout << "symmetric key received" << std::endl;
-				std::string symkey = privateKey->decrypt(content, message_size);
+				std::string symkey = privateKey->decrypt(msg.getContent(), msg.getMessageSize());
 				user_info->setSymKey((unsigned char*)symkey.c_str());
 				break;
 			}
 			case messageType::sendText:
-				std::cout << user_info->getSymKey()->decrypt(content, message_size) << std::endl;
+				std::cout << user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize()) << std::endl;
 				break;
 			default:
 				break;
 			}
 			std::cout << "-----<EOM>-----" << std::endl << std::endl;
 		}
-		
 	}
 	return resp;
 }
@@ -332,15 +304,9 @@ Response MessageU::sendMessage(ClientInfo* user_info, messageType message_type, 
 	req.version = VERSION;
 	req.code = uint16_t(requestCode::sendMessage);
 	req.client_id = client_id;
-	uint32_t content_size = content.length();
-	UUID dst_client_id = user_info->getId();
-	uint8_t message_type_id = uint8_t(message_type);
-	req.payload_size = sizeof(dst_client_id) + sizeof(message_type_id) + sizeof(content_size) + content_size;
-	req.payload = new char[req.payload_size]();
-	std::memcpy(req.payload, &dst_client_id, sizeof(dst_client_id));
-	std::memcpy(&req.payload[sizeof(dst_client_id)], &message_type_id, sizeof(message_type_id));
-	std::memcpy(&req.payload[sizeof(dst_client_id) + sizeof(message_type_id)], &content_size, sizeof(content_size));
-	std::memcpy(&req.payload[sizeof(dst_client_id) + sizeof(message_type_id) + sizeof(content_size)], content.c_str(), content_size);
+	Message msg = Message(user_info->getId(), message_type, content.size(), (char *)content.c_str());
+	req.payload_size = msg.getSizeBytes();
+	req.payload = msg.getBytes();
 	Response resp = req.sendRequset(serverIp, serverPort);
 	return resp;
 }

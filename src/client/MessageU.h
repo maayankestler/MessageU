@@ -3,6 +3,9 @@
 #include <map>
 #include <sstream>
 #include <iomanip>
+#include <stdio.h>
+#include <string.h>
+
 #include "filesutils.h"
 #include "StringUtils.h"
 #include "Protocol.h"

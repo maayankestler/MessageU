@@ -37,16 +37,38 @@ std::vector<Message> Message::ReadMessages(char* bytes, uint32_t size)
 	return msgs;
 }
 
-Message::Message(UUID to_client_id, uint32_t message_id, uint8_t message_type_id, uint32_t message_size, char* content = NULL)
+Message::Message(UUID to_client_id, uint32_t message_id, uint8_t message_type_id, uint32_t message_size, char* content)
 {
 	setToClientId(to_client_id);
 	setMessageId(message_id);
 	setMessageType(message_type_id);
 	setMessageSize(message_size);
-	content = content;
+	setContent(content);
 }
 
-Message::~Message()
+Message::Message(UUID to_client_id, messageType message_type_id, uint32_t message_size, char* content) :
+	Message(to_client_id, NULL, uint8_t(message_type_id), message_size, content) {}
+//{
+//	Message(to_client_id, NULL, uint8_t(message_type_id), message_size, content);
+//}
+
+char* Message::getBytes()
 {
-	delete content;
+	uint32_t size = getSizeBytes();
+	char* bytes = new char[size]();
+	std::memcpy(bytes, &_to_client_id, sizeof(_to_client_id));
+	std::memcpy(&bytes[sizeof(_to_client_id)], &_message_type_id, sizeof(_message_type_id));
+	std::memcpy(&bytes[sizeof(_to_client_id) + sizeof(_message_type_id)], &_message_size, sizeof(_message_size));
+	std::memcpy(&bytes[sizeof(_to_client_id) + sizeof(_message_type_id) + sizeof(_message_size)], _content, _message_size);
+	return bytes;
 }
+
+uint32_t Message::getSizeBytes()
+{
+	return sizeof(_to_client_id) + sizeof(_message_type_id) + sizeof(_message_size) + _message_size;
+}
+
+//Message::~Message()
+//{
+//	delete content;
+//}
