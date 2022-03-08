@@ -30,9 +30,7 @@ class Server:
     def handle_register_request(self, req):
         username = req.payload[:self._username_size].decode("utf8").strip("\0")
         pubkey = req.payload[self._username_size:]
-        # pubkey = b64encode(req.payload[self._username_size:])
         user = self.app.register_user(username, pubkey)
-        # return Response(self.version, ResponseCode.register, user.client_id.replace("-", ""))
         return Response(self.version, ResponseCode.register, user.client_id.bytes_le)
 
     def handle_get_users_request(self, req):
@@ -40,7 +38,7 @@ class Server:
         users_bytes = bytes()
         for user in users:
             users_bytes += bytes(user)
-        return Response(self.version, ResponseCode.users_list, users_bytes)  # TODO handle users list to payload
+        return Response(self.version, ResponseCode.users_list, users_bytes)
 
     def handle_get_pubkey_request(self, req):
         client_id = uuid.UUID(bytes_le=req.payload)
@@ -91,7 +89,6 @@ class Server:
                     resp.send(conn)
         except Exception as e:
             logging.error(f"got {e} Exception at {threading.currentThread().name}")
-            # TODO handle Exception
 
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

@@ -31,7 +31,8 @@ namespace InputEnum
         exitApp = 0
     };
 
-    static const userInput All[] = { 
+    // help to iterate the userInput options
+    static const userInput All[] = {
         userInput::registertion,
         userInput::clientsList,
         userInput::getPubKey,
@@ -49,7 +50,7 @@ class MessageU
 public:
     MessageU();
     static void printMenu();
-    Response handleInput(InputEnum::userInput choice);
+    Response handleInput(InputEnum::userInput choice); // handle input from the user
     inline static const std::string WELCOME_MESSAGE = "MessageU client at your service.";
     inline static const std::string SERVER_CONFIG_PATH = "server.info";
     inline static const std::string USER_INFO_PATH = "my.info";
@@ -69,7 +70,7 @@ private:
     Response getPubKey(ClientInfo* user_info);
     Response getMessages();
     Response sendMessage(ClientInfo* user_info, messageType type, std::string content);
-    std::map<std::string, ClientInfo*> clients;
-    std::map<std::string, std::string> clientsIdToUsername;
-    ClientInfo* getClientInput();
+    std::map<std::string, ClientInfo*> clients; // map usernames to use data (keys, id, etc)
+    std::map<std::string, std::string> clientsIdToUsername; // map the ids to usernames (so the client will work with usernames)
+    ClientInfo* getClientInput(); // help the get usrname as input and find the user info
 };

@@ -11,6 +11,12 @@ private:
     RSAPublicWrapper* _publicKey;
     AESWrapper* _symKey;
 public:
+    ClientInfo(std::string username, UUID id)
+    {
+        setUserName(username);
+        setId(id);
+    }
+
     void setUserName(std::string username)
     {
         _username = username;

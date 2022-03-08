@@ -12,20 +12,28 @@ MessageU::MessageU()
 	serverPort = std::stoi(port_str);
 	try
 	{
+		// try to read user data from file
 		std::string myinfo = FileUtils::fileToString(USER_INFO_PATH);
-		std::string b64private_key_str, client_id_str;
-
-		std::stringstream ss(myinfo);
-		std::getline(ss, username, '\n');
-		std::getline(ss, client_id_str, '\n');
-		ss << ss.rdbuf();
-		b64private_key_str = ss.str();
-		client_id = StringUtils::StrToUuid(client_id_str);
-		std::string private_key_str = Base64Wrapper::decode(b64private_key_str);
-		privateKey = new RSAPrivateWrapper(private_key_str);
-		std::string publicKey_str = privateKey->getPublicKey();
-		//std::string b64publicKey_str = Base64Wrapper::encode(publicKey_str);
-		publicKey = new RSAPublicWrapper(publicKey_str);
+		try
+		{
+			std::string b64private_key_str, client_id_str;
+			std::stringstream ss(myinfo);
+			std::getline(ss, username, '\n'); // read first line
+			std::getline(ss, client_id_str, '\n');
+			ss << ss.rdbuf();
+			b64private_key_str = ss.str();
+			client_id = StringUtils::StrToUuid(client_id_str); // save the uuid text from line 2 as UUID
+			std::string private_key_str = Base64Wrapper::decode(b64private_key_str); // decode the private key from line 3
+			privateKey = new RSAPrivateWrapper(private_key_str); // create the client's private key object
+			std::string publicKey_str = privateKey->getPublicKey();
+			publicKey = new RSAPublicWrapper(publicKey_str); // create the client's public key object
+		}
+		catch (const std::exception&)
+		{
+			std::cout << "can't procces file '" << USER_INFO_PATH  << "' please delete and register again" << std::endl << std::endl;
+			privateKey = NULL;
+			publicKey = NULL;
+		}
 	}
 	catch (const std::exception&)
 	{
@@ -33,6 +41,7 @@ MessageU::MessageU()
 		privateKey = NULL;
 		publicKey = NULL;
 	}
+	
 }
 
 Response MessageU::handleInput(InputEnum::userInput choice)
@@ -52,40 +61,42 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 			std::cout << "enter client username: ";
 			std::cin.ignore(); // flushing the input buffer
 			std::getline(std::cin, username);
+			//validate username size
 			if (username.length() > MAX_USERNAME_LENGTH - 1)
 			{
 				throw std::exception("username is to big");
 			}
-			resp = registerUser(username);
+			resp = registerUser(username); // call the register request
 			break;
 		}
 		case InputEnum::userInput::clientsList:
-			resp = getCLientList();
+			resp = getCLientList(); // call the get clients request
 			break;
 		case InputEnum::userInput::getPubKey:
 		{
 			ClientInfo* user_info = getClientInput();
-			resp = getPubKey(user_info);
+			resp = getPubKey(user_info); // call the get pubkey request
 			break;
 		}
 		case InputEnum::userInput::getMessages:
 		{
-			resp = getMessages();
+			resp = getMessages(); // call the get mesaages request
 			break;
 		}
 		case InputEnum::userInput::sendMessage:
 		{
 			ClientInfo* dst_client = getClientInput();
-			AESWrapper* sym_key = dst_client->getSymKey();
+			AESWrapper* sym_key = dst_client->getSymKey(); // get symkey
 			if (sym_key == NULL)
 			{
-				throw std::exception("can’t decrypt message");
+				throw std::exception("can't decrypt message");
 			}
 			std::string text_message;
 			std::cout << "enter text: ";
 			std::getline(std::cin, text_message);
+			// encrypt the message with the symkey
 			std::string text_message_encrypted = sym_key->encrypt(text_message.c_str(), text_message.length());
-			resp = sendMessage(dst_client, messageType::sendText, text_message_encrypted);
+			resp = sendMessage(dst_client, messageType::sendText, text_message_encrypted); // send the encrypted message
 			break;
 		}
 		case InputEnum::userInput::requestSymKey:
@@ -97,14 +108,17 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		case InputEnum::userInput::sendSymKey:
 		{
 			ClientInfo* dst_client = getClientInput();
+			// generate symkey
 			unsigned char key[AESWrapper::DEFAULT_KEYLENGTH];
 			AESWrapper::GenerateKey(key, AESWrapper::DEFAULT_KEYLENGTH);
 			dst_client->setSymKey(key);
+			// validate pubkey
 			if (dst_client->getPubKey() == NULL)
 			{
 				std::string err_msg = "unknown public key for '" + dst_client->getUserName() + "' please request public key";
 				throw std::exception(err_msg.c_str());
 			}
+			// encrypt the symkey
 			std::string sym_key = dst_client->getPubKey()->encrypt((const char*)key, AESWrapper::DEFAULT_KEYLENGTH);
 			resp = sendMessage(dst_client, messageType::sendSymKey, sym_key);
 			break;
@@ -113,21 +127,20 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 		{
 			ClientInfo* dst_client = getClientInput();
 			AESWrapper* sym_key = dst_client->getSymKey();
+			// validate that symkey exist between the users
 			if (sym_key == NULL)
 			{
 				throw std::exception("can't decrypt message");
 			}
 			std::string file_path;
 			std::cout << "enter file path: ";
-			//std::cin.ignore(); // flushing the input buffer
 			std::getline(std::cin, file_path);
-			std::string file_content = FileUtils::fileToString(file_path);
-			std::string file_content_encrypted = sym_key->encrypt(file_content.c_str(), file_content.length());
+			std::string file_content = FileUtils::fileToString(file_path); // read the file data
+			std::string file_content_encrypted = sym_key->encrypt(file_content.c_str(), file_content.length()); // encrypt the file data
 			resp = sendMessage(dst_client, messageType::sendFile, file_content_encrypted);
 			break;
 		}
 		case InputEnum::userInput::exitApp:
-			// TODO free some memory
 			break;
 		default:
 			std::cout << "Unkown option: " << int(choice) << std::endl;
@@ -136,6 +149,7 @@ Response MessageU::handleInput(InputEnum::userInput choice)
 	}
 	catch (const std::exception& ex)
 	{
+		// handle generic error
 		std::cout << "some error occured wile handling " << int(choice) << " request:" << std::endl;
 		std::cout << ex.what() << std::endl << std::endl;
 	}
@@ -153,6 +167,7 @@ void MessageU::printMenu() {
 
 std::string MessageU::optionToText(InputEnum::userInput option)
 {
+	// return the description for the wanted option
 	switch (option)
 	{
 	case InputEnum::userInput::registertion: return "Register";
@@ -170,48 +185,58 @@ std::string MessageU::optionToText(InputEnum::userInput option)
 
 Response MessageU::registerUser(std::string userName)
 {
+	// create request
 	Request req = Request(UUID(), VERSION, requestCode::registertion, MAX_USERNAME_LENGTH + RSAPublicWrapper::KEYSIZE);
+	// write the username to the payload
 	strncpy_s(req.getPayload(), userName.length() + 1, userName.c_str(), userName.length() + 1);
+
+	// generate private and public keys
 	privateKey = new RSAPrivateWrapper();
 	std::string private_key_str = privateKey->getPrivateKey();
 	std::string pubkey_str = privateKey->getPublicKey();
 	publicKey = new RSAPublicWrapper(pubkey_str);
+	// copy the publickey to the reuest payload
 	std::memcpy(&req.getPayload()[MAX_USERNAME_LENGTH], pubkey_str.c_str(), RSAPublicWrapper::KEYSIZE);
 	Response resp = req.sendRequset(serverIp, serverPort);
 	if (resp.getCode() == responseCode::registertion)
 	{
+		// init user's vars
 		username = userName;
 		std::memcpy(&client_id, resp.getPayload(), sizeof(UUID));
 		std::string client_id_str = StringUtils::UuidToStr(client_id);
+		// create user info file
 		std::ofstream myfile;
 		myfile.open(USER_INFO_PATH);
 		myfile << userName << std::endl << client_id_str << std::endl << Base64Wrapper::encode(private_key_str);
 		myfile.close();
-	}
-	
+	}	
 	return resp;
 }
+
 Response MessageU::getCLientList()
 {
+	// request the users list from the server
 	Request req = Request(client_id, VERSION, requestCode::users_list, 0);
 	Response resp = req.sendRequset(serverIp, serverPort);
 
-	UUID user_uuid;
-	std::cout << "ID" << std::string(30, ' ') << " | username" << std::endl;
-	std::cout << std::string(43, '-') << std::endl;
-	for (uint32_t i = 0; i < resp.getPayloadSize(); i += MAX_USERNAME_LENGTH + sizeof(UUID))
+	if (resp.getCode() == responseCode::usersList)
 	{
-		std::memcpy(&user_uuid, &resp.getPayload()[i], sizeof(UUID));
-		std::string user_uuid_str = StringUtils::UuidToStr(user_uuid);
-		std::cout << user_uuid_str << " | ";
-		std::string user_username(&resp.getPayload()[i + sizeof(UUID)]);
-		std::cout << user_username << std::endl;
-		clientsIdToUsername[user_uuid_str] = user_username;
-		if (clients[user_username] == NULL)
+		// print the users list as table
+		UUID user_uuid;
+		std::cout << "ID" << std::string(30, ' ') << " | username" << std::endl;
+		std::cout << std::string(43, '-') << std::endl;
+		for (uint32_t i = 0; i < resp.getPayloadSize(); i += MAX_USERNAME_LENGTH + sizeof(UUID))
 		{
-			clients[user_username] = new ClientInfo();
-			clients[user_username]->setUserName(user_username);
-			clients[user_username]->setId(user_uuid);
+			std::memcpy(&user_uuid, &resp.getPayload()[i], sizeof(UUID));
+			std::string user_uuid_str = StringUtils::UuidToStr(user_uuid);
+			std::cout << user_uuid_str << " | ";
+			std::string user_username(&resp.getPayload()[i + sizeof(UUID)]);
+			std::cout << user_username << std::endl;
+			clientsIdToUsername[user_uuid_str] = user_username;
+			if (clients[user_username] == NULL)
+			{
+				clients[user_username] = new ClientInfo(user_username, user_uuid);
+			}
 		}
 	}
 	return resp;
@@ -220,72 +245,83 @@ Response MessageU::getPubKey(ClientInfo* user_info)
 {
 	UUID dst_client_id = user_info->getId();
 	Request req = Request(client_id, VERSION, requestCode::getPubKey, sizeof(dst_client_id));
-	std::memcpy(req.getPayload(), &dst_client_id, sizeof(dst_client_id));
+	std::memcpy(req.getPayload(), &dst_client_id, sizeof(dst_client_id)); // copy the client id to the request
 	Response resp = req.sendRequset(serverIp, serverPort);
 	if (resp.getCode() == responseCode::getPubKey)
 	{
+		// procces the response and print the recived pubkey
 		RSAPublicWrapper* dst_pubkey = new RSAPublicWrapper(&resp.getPayload()[sizeof(UUID)], RSAPublicWrapper::KEYSIZE);
 		std::cout << std::endl << "the public key is:" << std::endl;
 		std::cout << Base64Wrapper::encode(dst_pubkey->getPublicKey());
-		user_info->setPubKey(dst_pubkey);
+		user_info->setPubKey(dst_pubkey); // save the user's pubkey
 	}
 	return resp;
 }
+
 Response MessageU::getMessages()
 {
 	Request req = Request(client_id, VERSION, requestCode::getMessages, 0);
 	Response resp = req.sendRequset(serverIp, serverPort);
-
-	std::vector<Message> msgs = Message::ReadMessages(resp.getPayload(), resp.getPayloadSize());
-	for (Message msg : msgs)
+	// validate the response code
+	if (resp.getCode() == responseCode::getMessages)
 	{
-		ClientInfo* user_info = clients[clientsIdToUsername[StringUtils::UuidToStr(msg.getToClientId())]];
-		if (user_info == NULL)
+		// create mesaages vector
+		std::vector<Message> msgs = Message::ReadMessages(resp.getPayload(), resp.getPayloadSize());
+		// procces the messages
+		for (Message msg : msgs)
 		{
-			std::string err_msg = "unknown user '" + StringUtils::UuidToStr(msg.getToClientId()) + "' please get clients list";
-			std::cout << err_msg << std::endl;
-		}
-		else
-		{
-			std::cout << "From: " << user_info->getUserName() << std::endl;
-			std::cout << "Content:" << std::endl;
-			switch (msg.getMessageType())
+			// get info about the sender
+			ClientInfo* user_info = clients[clientsIdToUsername[StringUtils::UuidToStr(msg.getToClientId())]];
+			if (user_info == NULL)
 			{
-			case messageType::sendFile:
+				std::string err_msg = "unknown user '" + StringUtils::UuidToStr(msg.getToClientId()) + "' please get clients list";
+				std::cout << err_msg << std::endl;
+			}
+			else
 			{
-				std::string file_content = user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize());
-				char temp_path[L_tmpnam_s];
-				tmpnam_s(temp_path, L_tmpnam_s);
-				FileUtils::stringToFile(file_content, std::string(temp_path));
-				std::cout << "file saved in path: " << temp_path << std::endl;
-				break;
+				// print the message
+				std::cout << "From: " << user_info->getUserName() << std::endl;
+				std::cout << "Content:" << std::endl;
+				switch (msg.getMessageType())
+				{
+				case messageType::sendFile:
+				{
+					// decrypt the file and save in local temp file
+					std::string file_content = user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize());
+					char temp_path[L_tmpnam_s];
+					tmpnam_s(temp_path, L_tmpnam_s); // genertae temp path
+					FileUtils::stringToFile(file_content, std::string(temp_path));
+					std::cout << "file saved in path: " << temp_path << std::endl;
+					break;
+				}
+				case messageType::requestSymKey:
+					std::cout << "Request for symmetric key" << std::endl;
+					break;
+				case messageType::sendSymKey:
+				{
+					std::cout << "symmetric key received" << std::endl;
+					std::string symkey = privateKey->decrypt(msg.getContent(), msg.getMessageSize());
+					user_info->setSymKey((unsigned char*)symkey.c_str()); // save the symkey
+					break;
+				}
+				case messageType::sendText:
+					// decrypt the text and print it
+					std::cout << user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize()) << std::endl;
+					break;
+				default:
+					break;
+				}
+				std::cout << "-----<EOM>-----" << std::endl << std::endl;
 			}
-			case messageType::requestSymKey:
-				std::cout << "Request for symmetric key" << std::endl;
-				break;
-			case messageType::sendSymKey:
-			{
-				std::cout << "symmetric key received" << std::endl;
-				std::string symkey = privateKey->decrypt(msg.getContent(), msg.getMessageSize());
-				user_info->setSymKey((unsigned char*)symkey.c_str());
-				break;
-			}
-			case messageType::sendText:
-				std::cout << user_info->getSymKey()->decrypt(msg.getContent(), msg.getMessageSize()) << std::endl;
-				break;
-			default:
-				break;
-			}
-			std::cout << "-----<EOM>-----" << std::endl << std::endl;
 		}
 	}
 	return resp;
 }
 Response MessageU::sendMessage(ClientInfo* user_info, messageType message_type, std::string content)
 {
-	Message msg = Message(user_info->getId(), message_type, content.size(), (char*)content.c_str());
-	Request req = Request(client_id, VERSION, requestCode::sendMessage, msg.getSizeBytes(), msg.getBytes());
-	Response resp = req.sendRequset(serverIp, serverPort);
+	Message msg = Message(user_info->getId(), message_type, content.size(), (char*)content.c_str()); // create message
+	Request req = Request(client_id, VERSION, requestCode::sendMessage, msg.getSizeBytes(), msg.getBytes()); // create request from the message
+	Response resp = req.sendRequset(serverIp, serverPort); // send the request
 	return resp;
 }
 
@@ -296,6 +332,7 @@ ClientInfo* MessageU::getClientInput()
 	std::cin.ignore(); // flushing the input buffer
 	std::getline(std::cin, client_username);
 	ClientInfo* dst_client = clients[client_username];
+	// validate the user exist in local data
 	if (dst_client == NULL)
 	{
 		std::string err_msg = "unknown client '" + client_username + "' please get clients list";

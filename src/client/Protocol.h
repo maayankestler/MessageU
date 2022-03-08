@@ -39,9 +39,9 @@ private:
     char* _payload{};
     static const int HEADER_SIZE = sizeof(_version) + sizeof(_code) + sizeof(_payload_size);
     static const int CHUNK_SIZE = 256;
-    static Response processResponseHeader(char serverdata[HEADER_SIZE]);
+    static Response processResponseHeader(char serverdata[HEADER_SIZE]); // create request from the header only
 public:
-    static Response processResponse(SOCKET ConnectSocket);
+    static Response processResponse(SOCKET ConnectSocket); // create request from connected socket
 
     void setPayload(char* payload) {
         _payload = payload;
@@ -94,8 +94,8 @@ private:
     const int HEADER_SIZE = sizeof(_client_id) + sizeof(_version) + sizeof(_code) + sizeof(_payload_size);
 public:
     Request(UUID client_id, uint8_t version, requestCode _code, uint32_t _payload_size, char* _payload = NULL);
-    char* getRequestBytes();
-    Response sendRequset(std::string ip, int port);
+    char* getRequestBytes(); // get the requests as bytes by the protocol
+    Response sendRequset(std::string ip, int port); // send the request to the server
 
     void setClientId(UUID id) {
         _client_id = id;
@@ -111,7 +111,6 @@ public:
         if (payload == NULL && _payload_size > 0)
         {
             _payload = new char[_payload_size]();
-            
         }
         else
         {

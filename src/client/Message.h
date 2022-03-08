@@ -21,7 +21,6 @@ public:
 	static std::vector<Message> ReadMessages(char* bytes, uint32_t size);
 	Message(UUID user_uuid, uint32_t message_id, uint8_t message_type_id, uint32_t message_size, char* content = NULL);
 	Message(UUID user_uuid, messageType message_type_id, uint32_t message_size, char* content = NULL);
-	//~Message();
 	char* getBytes();
 	uint32_t getSizeBytes();
 

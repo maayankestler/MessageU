@@ -17,7 +17,7 @@ class Request:
     _chunk_size = 256
 
     def __init__(self, client_id, version, code, payload_size=0, payload=""):
-        self.client_id = uuid.UUID(bytes_le=client_id)
+        self.client_id = uuid.UUID(bytes_le=client_id)  # translate bytes to UUID object
         self.version = version
         self.code = RequestCode(code)
         self.payload_size = payload_size
@@ -29,16 +29,17 @@ class Request:
 
     @staticmethod
     def process_request(conn):
-        # read client id, Version, Code and Payload size
+        # read client id, Version, Code and Payload size from the request
         pack_format = f"<{Request.client_id_size}sBHI"
         header_bytes = conn.recv(struct.calcsize(pack_format))
-        data = struct.unpack(pack_format, header_bytes)
+        data = struct.unpack(pack_format, header_bytes)  # process the header bytes
         i = struct.calcsize(pack_format)
         payload_size = data[-1]
 
         # if there is a payload
         if payload_size:
             payload_bytes = bytes()
+            # read the payload bytes in chunks
             for i in range(0, payload_size, Request._chunk_size):
                 read_size = min(Request._chunk_size, payload_size - i)
                 payload_bytes += conn.recv(read_size)
@@ -64,7 +65,6 @@ class Response:
             self.code = ResponseCode(code)
         except ValueError:
             self.code = None
-        # self.payload_size = payload_size
         self.payload_size = len(payload)
         self.payload = payload
 
@@ -72,7 +72,9 @@ class Response:
         return f"version: {self.version}, code: {self.code.value}, payload: {self.payload}"
 
     def send(self, conn):
+        # create the header bytes
         b = struct.pack("<BHI", self.version, self.code.value, self.payload_size)
+        # create the payload bytes (if there is a payload)
         if self.payload_size:
             b += self.payload
         conn.sendall(b)

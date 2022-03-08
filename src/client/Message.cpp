@@ -8,7 +8,7 @@ std::vector<Message> Message::ReadMessages(char* bytes, uint32_t size)
 	uint8_t message_type_id;
 	messageType message_type;
 	uint32_t message_size;
-	char* content = NULL;
+	char* content;
 	uint32_t i = 0;
 	while (i < size)
 	{
@@ -48,9 +48,6 @@ Message::Message(UUID to_client_id, uint32_t message_id, uint8_t message_type_id
 
 Message::Message(UUID to_client_id, messageType message_type_id, uint32_t message_size, char* content) :
 	Message(to_client_id, NULL, uint8_t(message_type_id), message_size, content) {}
-//{
-//	Message(to_client_id, NULL, uint8_t(message_type_id), message_size, content);
-//}
 
 char* Message::getBytes()
 {
@@ -67,8 +64,3 @@ uint32_t Message::getSizeBytes()
 {
 	return sizeof(_to_client_id) + sizeof(_message_type_id) + sizeof(_message_size) + _message_size;
 }
-
-//Message::~Message()
-//{
-//	delete content;
-//}

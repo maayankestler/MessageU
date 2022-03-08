@@ -11,13 +11,7 @@ class MessageU:
 
     def __init__(self, db_file="server.db"):
         self.db_file = db_file
-        # self.connection = sqlite3.connect(self.db_file, check_same_thread=False)  # TODO think about multi threads
-        # self.cursor = self.connection.cursor()
         self.init_tables()
-
-    # def __del__(self):
-    #     self.cursor.close()
-    #     self.connection.close()
 
     def init_tables(self):
         try:
@@ -33,7 +27,7 @@ class MessageU:
                                                              Content BLOB,
                                                              ID INTEGER PRIMARY KEY AUTOINCREMENT)''')
         except sqlite3.OperationalError as e:
-            logging.warning(e)
+            logging.warning(e)  # warning if the tables already exist
 
     def register_user(self, username, pubkey):
         user = User(username=username, pubkey=pubkey)
@@ -42,17 +36,17 @@ class MessageU:
                 with closing(connection.cursor()) as cursor:
                     cursor.execute('''INSERT INTO clients(UserName,ID,PublicKey,LastSeen) VALUES(?,?,?,?)''',
                                    (user.username, user.client_id.bytes_le, user.pubkey, user.last_seen))
-                connection.commit()
+                connection.commit()  # commit the changes
             return user
-        except sqlite3.IntegrityError:
-            logging.warning(f"user {username} already exist")
-            # TODO return error to client
+        except sqlite3.IntegrityError as e:
+            logging.error(f"user {username} already exist")
+            raise e
 
     def get_users_list(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
                 users = list(cursor.execute('SELECT * FROM clients WHERE ID!=:id', {"id": client_id.bytes_le}))
-        users = list(map(lambda r: User(*r), users))
+        users = list(map(lambda r: User(*r), users))  # process rows to User objects
         return users
 
     def get_pub_key(self, client_id):
@@ -60,7 +54,7 @@ class MessageU:
             with closing(connection.cursor()) as cursor:
                 user_row_list = list(cursor.execute('SELECT * FROM clients WHERE ID=:id', {"id": client_id.bytes_le}))
         assert len(user_row_list) > 0, f"client {client_id} not found"
-        user = User(*user_row_list[0])
+        user = User(*user_row_list[0])  # process row to User object
         return user.pubkey
 
     def send_message(self, to_client, from_client, message_type, content=b""):
@@ -71,20 +65,20 @@ class MessageU:
                     cursor.execute('''INSERT INTO messages(ToClient,FromClient,Type,Content) VALUES(?,?,?,?)''',
                                    (msg.to_client.bytes_le, msg.from_client.bytes_le, msg.message_type, msg.content))
                     if not msg.message_id:
-                        msg.message_id = cursor.lastrowid
+                        msg.message_id = cursor.lastrowid  # update the message id
                 connection.commit()
             return msg
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as e:
             logging.warning(f"message with id {msg.message_id} already exist")
-            # TODO return error to client
+            raise e
 
     def get_messages(self, client_id):
         with sqlite3.connect(self.db_file) as connection:
             with closing(connection.cursor()) as cursor:
                 msgs_rows = list(cursor.execute('SELECT * FROM messages WHERE ToClient=:id', {"id": client_id.bytes_le}))
-        # msgs = list(map(lambda r: Message(*r), msgs))
         msgs = []
         for r in msgs_rows:
+            # process messages rows
             to_client, from_client, message_type, content, message_id = r
             msg = Message(uuid.UUID(bytes_le=to_client), uuid.UUID(bytes_le=from_client),
                           message_type, content, message_id)
@@ -121,17 +115,12 @@ class Message:
         self.from_client = from_client
         self.message_type = message_type
         self.content = content if content else bytes()
-        self.message_id = message_id  # TODO create message ID
+        self.message_id = message_id  # created by the db AUTOINCREMENT
 
     def __str__(self):
         return f"message with id '{self.message_id}'  from '{self.from_client}' to '{self.to_client}'"
 
-    def __bytes__(self):  # , full_message=False):
+    def __bytes__(self):
         b = self.from_client.bytes_le + struct.pack("<IBI", self.message_id, self.message_type, len(self.content))
         b += self.content
-        # if full_message:
-        #     b += self.from_client.bytes_le + struct.pack("<IB", self.message_id, self.message_type)
-        #     b += self.content
-        # else:
-        #     b += self.to_client.bytes_le + struct.pack("<I", self.message_id)
         return b
